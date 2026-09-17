@@ -58,13 +58,16 @@ def default_registry(
     tradelocker_email: str = "",
     tradelocker_password: str = "",
     tradelocker_account_server: str = "",
+    data_root: str = "",
 ) -> ProviderRegistry:
     from app.providers.fixture import SyntheticFixtureProvider
+    from app.providers.history_file import HistoricalFileProvider
     from app.providers.unconfigured import UnconfiguredProvider
 
     registry = ProviderRegistry()
     registry.register(UnconfiguredProvider.name, UnconfiguredProvider)
     registry.register(SyntheticFixtureProvider.name, SyntheticFixtureProvider)
+    registry.register(HistoricalFileProvider.name, lambda: HistoricalFileProvider(data_root))
 
     if tradelocker_server and tradelocker_email and tradelocker_password:
         from app.providers.tradelocker import TradeLockerProvider

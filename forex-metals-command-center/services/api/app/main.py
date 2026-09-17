@@ -63,6 +63,7 @@ def create_app(
         tradelocker_email=settings.tradelocker_email.get_secret_value() if settings.tradelocker_email else "",
         tradelocker_password=settings.tradelocker_password.get_secret_value() if settings.tradelocker_password else "",
         tradelocker_account_server=settings.tradelocker_account_server,
+        data_root=settings.data_root,
     ).create(settings.market_data_provider)
     bus = InMemoryEventBus()
     candles = CandleService(provider, clock)

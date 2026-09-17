@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     tradelocker_email: SecretStr | None = None
     tradelocker_password: SecretStr | None = None
     tradelocker_account_server: str = ""  # e.g. LIVVFX
+    # Root of the validated historical dataset tree (cleaned/, manifests/, raw/). Read-only.
+    data_root: str = ""
     execution_timeframe: Timeframe = Timeframe.M5
     cors_origins: str = "http://localhost:3000"
     # Manual account profile (balance, limits, day state, user contract specs). Server-side, never committed.

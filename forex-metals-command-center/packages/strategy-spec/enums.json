@@ -50,6 +50,11 @@
     "DOWN",
     "UNKNOWN"
   ],
+  "ResearchStatus": [
+    "APPROVED_FOR_RESEARCH",
+    "APPROVED_WITH_WARNINGS",
+    "NOT_APPROVED"
+  ],
   "IssueSeverity": [
     "WARNING",
     "ERROR"

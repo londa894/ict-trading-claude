@@ -24,6 +24,13 @@ export type MarketStatus = (typeof MARKET_STATUSES)[number];
 export const PROVIDER_HEALTH_STATUSES = ["HEALTHY", "DEGRADED", "DOWN", "UNKNOWN"] as const;
 export type ProviderHealthStatus = (typeof PROVIDER_HEALTH_STATUSES)[number];
 
+export const RESEARCH_STATUSES = [
+  "APPROVED_FOR_RESEARCH",
+  "APPROVED_WITH_WARNINGS",
+  "NOT_APPROVED",
+] as const;
+export type ResearchStatus = (typeof RESEARCH_STATUSES)[number];
+
 export const ISSUE_SEVERITIES = ["WARNING", "ERROR"] as const;
 export type IssueSeverity = (typeof ISSUE_SEVERITIES)[number];
 
@@ -95,6 +102,7 @@ export const CONTRACT_ENUMS = {
   AssetClass: ASSET_CLASSES,
   MarketStatus: MARKET_STATUSES,
   ProviderHealthStatus: PROVIDER_HEALTH_STATUSES,
+  ResearchStatus: RESEARCH_STATUSES,
   IssueSeverity: ISSUE_SEVERITIES,
   ValidationIssueCode: VALIDATION_ISSUE_CODES,
   PositionSizeStatus: POSITION_SIZE_STATUSES,

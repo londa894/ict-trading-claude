@@ -39,7 +39,7 @@ def test_provider_instance_name_is_also_checked():
 
 def test_registry_unknown_and_duplicate():
     reg = default_registry()
-    assert reg.names() == ["fixture", "unconfigured"]
+    assert reg.names() == ["fixture", "historical_file", "unconfigured"]
     with pytest.raises(UnknownProviderError):
         reg.create("nope")
     with pytest.raises(ValueError):

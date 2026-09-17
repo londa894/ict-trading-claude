@@ -94,6 +94,14 @@ class MarketStatus(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class ResearchStatus(StrEnum):
+    """Validation verdict of a historical dataset (written by the offline validator)."""
+
+    APPROVED_FOR_RESEARCH = "APPROVED_FOR_RESEARCH"
+    APPROVED_WITH_WARNINGS = "APPROVED_WITH_WARNINGS"
+    NOT_APPROVED = "NOT_APPROVED"
+
+
 class ProviderHealthStatus(StrEnum):
     HEALTHY = "HEALTHY"
     DEGRADED = "DEGRADED"
@@ -1028,6 +1036,7 @@ CONTRACT_ENUMS: dict[str, type[StrEnum]] = {
     "AssetClass": AssetClass,
     "MarketStatus": MarketStatus,
     "ProviderHealthStatus": ProviderHealthStatus,
+    "ResearchStatus": ResearchStatus,
     "IssueSeverity": IssueSeverity,
     "ValidationIssueCode": ValidationIssueCode,
     "PositionSizeStatus": PositionSizeStatus,
