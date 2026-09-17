@@ -1,0 +1,62 @@
+{
+  "$comment": "Phase 5 No Wick Architecture V1. Classification thresholds are the spec's initial research thresholds (STEP 13); everything else is a research default. Any change must bump strategyVersion.",
+  "classification": {
+    "trueBodyPct": 0.9,
+    "trueMaxWickPct": 0.05,
+    "nearBodyPct": 0.8,
+    "nearMaxWickPct": 0.1,
+    "oneSidedMaxWickPct": 0.05,
+    "oneSidedMinBodyPct": 0.5
+  },
+  "strength": {
+    "meaningfulBodyAtr": 0.8,
+    "strongBodyAtr": 1.2,
+    "exceptionalBodyAtr": 1.5
+  },
+  "medianLookback": 20,
+  "quality": {
+    "$comment": "CandleQualityScore: candle-only, weights sum to 100.",
+    "originWick": 25,
+    "destinationWick": 15,
+    "bodyPct": 30,
+    "bodyAtr": 30
+  },
+  "context": {
+    "$comment": "ContextScore: only facts known at the candle's close. Evaluated weights sum to 100: displacement 25, structure 25, liquidity 20, fvg 10, trend 10, session 10 (time quality of the candle's open time, Phase 6). NEWS (Phase 13) is NOT_EVALUATED.",
+    "displacement": {
+      "WEAK": 10,
+      "MODERATE": 18,
+      "STRONG": 25,
+      "EXCEPTIONAL": 25
+    },
+    "structure": {
+      "BOS": 15,
+      "CHOCH": 15,
+      "MSS": 25
+    },
+    "liquidity": 20,
+    "liquidityLookbackBars": 3,
+    "fvg": 10,
+    "trend": 10,
+    "session": {
+      "IDEAL": 10,
+      "ACCEPTABLE": 5,
+      "LOW_QUALITY": 0,
+      "AVOID": 0
+    }
+  },
+  "relevance": {
+    "qualityWeight": 0.4,
+    "contextWeight": 0.6,
+    "insideBarMultiplier": 0.5
+  },
+  "zone": {
+    "touchToleranceAtr": 0.02,
+    "approachDistanceAtr": 0.5,
+    "reactionAtr": 0.5,
+    "reactionWindowBars": 5
+  },
+  "decisionContext": {
+    "timeframe": "M15"
+  }
+}

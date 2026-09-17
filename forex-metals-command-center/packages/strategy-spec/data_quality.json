@@ -1,0 +1,23 @@
+{
+  "$comment": "Phase 0 data-quality thresholds. Research defaults, not optimised. All ages in seconds.",
+  "quoteAge": {
+    "liveMaxSeconds": 5,
+    "currentMaxSeconds": 60,
+    "delayedMaxSeconds": 900
+  },
+  "candleLag": {
+    "$comment": "Market-hours aware for every engine-supported timeframe (M1..H1 UTC buckets, H4/D1 New York 17:00 buckets). missingBars = expected buckets containing open market time after the latest closed candle whose close_time + grace <= now. Unsupported timeframes (W1/MN1) are always STALE (fail-safe).",
+    "graceSeconds": 15,
+    "currentMaxMissingBars": 0,
+    "delayedMaxMissingBars": 2
+  },
+  "badTick": {
+    "$comment": "maxJumpPct: quote mid vs reference price. candleRangeMedianMultiple: candle range vs median range of lookback closed candles.",
+    "METAL": { "maxJumpPct": 1.0, "providerDisagreementPct": 0.1 },
+    "FX_MAJOR": { "maxJumpPct": 0.5, "providerDisagreementPct": 0.05 },
+    "FX_CROSS": { "maxJumpPct": 0.6, "providerDisagreementPct": 0.06 },
+    "candleRangeMedianMultiple": 15,
+    "candleRangeLookback": 20,
+    "candleRangeMinSamples": 10
+  }
+}

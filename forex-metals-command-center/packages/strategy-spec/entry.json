@@ -1,0 +1,18 @@
+{
+  "$comment": "Phase 8 entry confirmation research defaults (not optimised). Default XAUUSD: 15M context/confirmation, 5M execution (LTF refinement). A confirmed plan is NOT a trade authorization until the risk (Phase 9) and news (Phase 13) gates exist. Any change must bump strategyVersion.",
+  "mode": "STANDARD",
+  "modes": {
+    "CONSERVATIVE": { "models": ["CONSERVATIVE_RETEST"], "minRr": 2.5 },
+    "STANDARD": { "models": ["LTF_REFINEMENT", "NO_WICK_REBALANCE", "M15_CLOSE"], "minRr": 2.0 },
+    "AGGRESSIVE": { "models": ["LIMIT_RESEARCH", "LTF_REFINEMENT", "NO_WICK_REBALANCE", "M15_CLOSE"], "minRr": 1.5 }
+  },
+  "executionTimeframe": "M5",
+  "executionBars": 900,
+  "ltfBreakTypes": ["CHOCH", "MSS"],
+  "confirmationWindowBars": 4,
+  "stopBufferAtr": 0.1,
+  "minTp1Atr": 1.0,
+  "targetDistinctAtr": 0.25,
+  "weakFvgSizeAtr": 0.3,
+  "includeConfirmedIfvg": true
+}

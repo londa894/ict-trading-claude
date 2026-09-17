@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tradingview": {
+      "command": "node",
+      "args": ["C:/Users/Londa/OneDrive/Documents/tradingview-mcp-main/tradingview-mcp-main/src/server.js"]
+    }
+  }
+}

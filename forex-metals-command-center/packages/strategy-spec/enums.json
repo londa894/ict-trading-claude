@@ -1,0 +1,802 @@
+{
+  "$comment": "Single source of truth for cross-language enum values. Python (services/api/app/domain/enums.py) and TypeScript (packages/shared-types) are contract-tested against this file. Only add values here when the phase that owns them is implemented.",
+  "Verdict": [
+    "LONG",
+    "SHORT",
+    "WAIT",
+    "NO_TRADE",
+    "UNAVAILABLE"
+  ],
+  "DecisionConfidence": [
+    "LOW",
+    "MODERATE",
+    "HIGH",
+    "VERY_HIGH"
+  ],
+  "DataQuality": [
+    "LIVE",
+    "CURRENT",
+    "DELAYED",
+    "STALE",
+    "DISCONNECTED",
+    "INVALID"
+  ],
+  "Timeframe": [
+    "M1",
+    "M3",
+    "M5",
+    "M15",
+    "M30",
+    "H1",
+    "H4",
+    "D1",
+    "W1",
+    "MN1"
+  ],
+  "AssetClass": [
+    "METAL",
+    "FX_MAJOR",
+    "FX_CROSS"
+  ],
+  "MarketStatus": [
+    "OPEN",
+    "CLOSED",
+    "DAILY_BREAK",
+    "UNKNOWN"
+  ],
+  "ProviderHealthStatus": [
+    "HEALTHY",
+    "DEGRADED",
+    "DOWN",
+    "UNKNOWN"
+  ],
+  "IssueSeverity": [
+    "WARNING",
+    "ERROR"
+  ],
+  "ValidationIssueCode": [
+    "NON_UTC_TIMESTAMP",
+    "MISALIGNED_OPEN_TIME",
+    "NON_POSITIVE_PRICE",
+    "NON_FINITE_VALUE",
+    "IMPOSSIBLE_OHLC",
+    "ZERO_RANGE",
+    "NEGATIVE_VOLUME",
+    "DUPLICATE_IDENTICAL",
+    "DUPLICATE_CONFLICT",
+    "OUT_OF_ORDER",
+    "MISSING_BARS",
+    "SUSPECT_BAD_TICK",
+    "CROSSED_QUOTE",
+    "WIDE_SPREAD",
+    "PROVIDER_DISAGREEMENT",
+    "SYMBOL_MISMATCH",
+    "TIMEFRAME_MISMATCH",
+    "EMPTY_SERIES",
+    "INCOMPLETE_BUCKET"
+  ],
+  "PositionSizeStatus": [
+    "VERIFIED",
+    "SIZED_FROM_USER_SPEC",
+    "POSITION_SIZE_UNVERIFIED"
+  ],
+  "Blocker": [
+    "SYSTEM_INTEGRITY_FAILURE",
+    "UNKNOWN_SYMBOL",
+    "PROVIDER_UNAVAILABLE",
+    "NO_DATA",
+    "DATA_INVALID",
+    "DATA_STALE",
+    "DATA_DISCONNECTED",
+    "DATA_DELAYED",
+    "DATA_GAP",
+    "DATA_SUSPECT_BAD_TICK",
+    "DATA_SYNTHETIC",
+    "MARKET_CLOSED",
+    "INSTRUMENT_SPEC_MISSING",
+    "DOL_UNCLEAR",
+    "ANALYSIS_GATES_NOT_IMPLEMENTED",
+    "ENTRY_MISSED",
+    "INSUFFICIENT_RR",
+    "RISK_GATE_MISSING",
+    "NEWS_GATE_MISSING",
+    "RISK_PROFILE_MISSING",
+    "RISK_PROFILE_INVALID",
+    "RISK_LOCKED",
+    "UNSAFE_SPREAD",
+    "POSITION_SIZE_UNVERIFIED",
+    "MARKET_NOT_VALIDATED",
+    "NEWS_BLACKOUT",
+    "NEWS_POST_WAIT",
+    "NEWS_DATA_UNAVAILABLE",
+    "NEWS_DATA_SYNTHETIC"
+  ],
+  "StructureState": [
+    "BULLISH",
+    "BEARISH",
+    "RANGING",
+    "TRANSITIONING",
+    "UNCLEAR"
+  ],
+  "TrendDirection": [
+    "BULLISH",
+    "BEARISH",
+    "NONE"
+  ],
+  "Direction": [
+    "BULLISH",
+    "BEARISH"
+  ],
+  "StructureLevel": [
+    "INTERNAL",
+    "EXTERNAL"
+  ],
+  "SwingKind": [
+    "HIGH",
+    "LOW"
+  ],
+  "SwingLabel": [
+    "HH",
+    "HL",
+    "LH",
+    "LL",
+    "EH",
+    "EL",
+    "NONE"
+  ],
+  "StructureEventType": [
+    "BOS",
+    "CHOCH",
+    "MSS"
+  ],
+  "StructureEventStatus": [
+    "CONFIRMED",
+    "POTENTIAL"
+  ],
+  "BreakConfirmation": [
+    "CANDLE_CLOSE",
+    "WICK_ONLY"
+  ],
+  "QualifierStatus": [
+    "NOT_EVALUATED",
+    "PRESENT",
+    "ABSENT"
+  ],
+  "MtfAlignment": [
+    "ALIGNED_BULLISH",
+    "ALIGNED_BEARISH",
+    "MIXED",
+    "UNCLEAR"
+  ],
+  "HtfBias": [
+    "BULLISH",
+    "BEARISH",
+    "RANGING",
+    "TRANSITIONING",
+    "MIXED",
+    "UNCLEAR",
+    "UNKNOWN"
+  ],
+  "AnalysisIneligibility": [
+    "DATA_SYNTHETIC",
+    "DATA_STALE",
+    "DATA_INVALID",
+    "DATA_DISCONNECTED",
+    "INSUFFICIENT_CANDLES",
+    "KEY_LEVELS_UNAVAILABLE",
+    "LIQUIDITY_ANALYSIS_FAILED",
+    "PD_ARRAY_ANALYSIS_FAILED",
+    "NO_WICK_ANALYSIS_FAILED",
+    "SESSION_LEVELS_UNAVAILABLE",
+    "SESSION_ANALYSIS_FAILED",
+    "SETUP_BIAS_UNAVAILABLE",
+    "SETUP_ANALYSIS_FAILED",
+    "EVALUATION_FAILED"
+  ],
+  "LiquiditySide": [
+    "BSL",
+    "SSL"
+  ],
+  "LiquidityScope": [
+    "INTERNAL",
+    "EXTERNAL"
+  ],
+  "LiquidityPoolType": [
+    "SWING_HIGH",
+    "SWING_LOW",
+    "EQH",
+    "EQL",
+    "PDH",
+    "PDL",
+    "PWH",
+    "PWL",
+    "ASIA_HIGH",
+    "ASIA_LOW",
+    "LONDON_HIGH",
+    "LONDON_LOW",
+    "NY_AM_HIGH",
+    "NY_AM_LOW",
+    "NY_PM_HIGH",
+    "NY_PM_LOW"
+  ],
+  "LiquidityState": [
+    "FRESH",
+    "APPROACHING",
+    "TOUCHED",
+    "SWEPT",
+    "RUN",
+    "BROKEN",
+    "RECLAIMED"
+  ],
+  "LiquidityEventType": [
+    "TOUCH",
+    "SWEEP",
+    "BREAK",
+    "RUN",
+    "RECLAIM",
+    "SWEEP_FAILED"
+  ],
+  "DolConfidence": [
+    "HIGH",
+    "MODERATE",
+    "LOW",
+    "UNCLEAR"
+  ],
+  "DisplacementGrade": [
+    "WEAK",
+    "MODERATE",
+    "STRONG",
+    "EXCEPTIONAL"
+  ],
+  "PdArrayType": [
+    "FVG",
+    "IFVG"
+  ],
+  "PdArrayState": [
+    "FRESH",
+    "TOUCHED",
+    "PARTIAL",
+    "HALF",
+    "FULL",
+    "INVALIDATED"
+  ],
+  "IfvgStatus": [
+    "POTENTIAL_IFVG",
+    "CONFIRMED_IFVG",
+    "FAILED_IFVG"
+  ],
+  "PdArrayEventType": [
+    "CREATED",
+    "TOUCHED",
+    "PARTIAL_FILL",
+    "HALF_FILL",
+    "FULL_FILL",
+    "INVALIDATED",
+    "IFVG_POTENTIAL",
+    "IFVG_CONFIRMED",
+    "IFVG_FAILED"
+  ],
+  "NoWickClassification": [
+    "TRUE_BULLISH_MARUBOZU",
+    "TRUE_BEARISH_MARUBOZU",
+    "NEAR_BULLISH_MARUBOZU",
+    "NEAR_BEARISH_MARUBOZU",
+    "BULLISH_NO_LOWER_WICK",
+    "BEARISH_NO_UPPER_WICK",
+    "BULLISH_NO_UPPER_WICK",
+    "BEARISH_NO_LOWER_WICK",
+    "NO_ORIGIN_SIDE_WICK",
+    "NO_DESTINATION_SIDE_WICK",
+    "NEWS_DRIVEN_NO_WICK",
+    "INSIGNIFICANT_NO_WICK"
+  ],
+  "NoWickStrength": [
+    "INSIGNIFICANT",
+    "MEANINGFUL",
+    "STRONG",
+    "EXCEPTIONAL"
+  ],
+  "NoWickZoneState": [
+    "FRESH",
+    "APPROACHING",
+    "TOUCHED",
+    "PARTIAL",
+    "HALF_REBALANCED",
+    "FULLY_REBALANCED",
+    "REACTED",
+    "FAILED",
+    "INVALIDATED"
+  ],
+  "NoWickZoneEventType": [
+    "TOUCHED",
+    "REBALANCE_25",
+    "REBALANCE_50",
+    "REBALANCE_75",
+    "FULLY_REBALANCED",
+    "REACTED",
+    "FAILED",
+    "INVALIDATED"
+  ],
+  "NoWickContextFactor": [
+    "DISPLACEMENT",
+    "STRUCTURE",
+    "LIQUIDITY",
+    "FVG",
+    "TREND",
+    "SESSION",
+    "NEWS"
+  ],
+  "ScoreComponentStatus": [
+    "EVALUATED",
+    "NOT_EVALUATED"
+  ],
+  "SessionName": [
+    "ASIA",
+    "LONDON",
+    "NY_AM",
+    "NY_PM",
+    "LONDON_CLOSE"
+  ],
+  "KillZone": [
+    "LONDON_KZ",
+    "NY_AM_KZ",
+    "NY_PM_KZ"
+  ],
+  "SessionInstanceState": [
+    "NOT_STARTED",
+    "FORMING",
+    "COMPLETE",
+    "INCOMPLETE"
+  ],
+  "AsianRangeState": [
+    "TIGHT",
+    "NORMAL",
+    "EXPANDED",
+    "ABNORMALLY_LARGE"
+  ],
+  "SessionQuality": [
+    "IDEAL",
+    "ACCEPTABLE",
+    "LOW_QUALITY",
+    "AVOID"
+  ],
+  "ExpansionState": [
+    "CONSOLIDATING",
+    "EARLY",
+    "ACTIVE",
+    "LATE",
+    "EXHAUSTED"
+  ],
+  "JudasStatus": [
+    "CANDIDATE",
+    "CONFIRMED",
+    "FAILED"
+  ],
+  "SetupState": [
+    "DISCOVERED",
+    "WATCH",
+    "SETUP_FORMING",
+    "LIQUIDITY_EVENT",
+    "WAITING_FOR_MSS",
+    "SETUP_ARMED",
+    "WAITING_FOR_RETRACEMENT",
+    "ENTRY_ZONE_APPROACHING",
+    "ENTRY_ZONE_TOUCHED",
+    "WAITING_FOR_CONFIRMATION",
+    "LONG_READY",
+    "SHORT_READY",
+    "ENTRY_MISSED",
+    "INVALIDATED",
+    "EXPIRED",
+    "BLOCKED",
+    "ACTIVE",
+    "CLOSED"
+  ],
+  "SetupType": [
+    "LIQUIDITY_SWEEP_MSS"
+  ],
+  "SetupStep": [
+    "HTF_BIAS",
+    "DOL_TARGET",
+    "LIQUIDITY_EVENT",
+    "DISPLACEMENT",
+    "MSS",
+    "PD_ARRAY",
+    "RETRACEMENT",
+    "LTF_CONFIRMATION",
+    "RISK"
+  ],
+  "SetupStepStatus": [
+    "DONE",
+    "PENDING",
+    "NOT_EVALUATED"
+  ],
+  "Po3Phase": [
+    "ACCUMULATION",
+    "MANIPULATION",
+    "DISTRIBUTION",
+    "UNCLEAR"
+  ],
+  "EntryModel": [
+    "CONSERVATIVE_RETEST",
+    "M15_CLOSE",
+    "LTF_REFINEMENT",
+    "NO_WICK_REBALANCE",
+    "BREAKER",
+    "IFVG",
+    "LIMIT_RESEARCH"
+  ],
+  "EntryMode": [
+    "CONSERVATIVE",
+    "STANDARD",
+    "AGGRESSIVE"
+  ],
+  "EntryWarning": [
+    "EARLY_BEFORE_MSS",
+    "DURING_SWEEP",
+    "INSIDE_DISPLACEMENT",
+    "BEFORE_CLOSE",
+    "BEFORE_RETRACEMENT",
+    "WEAK_FVG",
+    "AGAINST_HTF",
+    "BEFORE_MAJOR_NEWS"
+  ],
+  "ScoreFactor": [
+    "HTF",
+    "LIQUIDITY",
+    "STRUCTURE",
+    "DISPLACEMENT",
+    "PD_ARRAY",
+    "NO_WICK",
+    "SESSION",
+    "MACRO",
+    "ENTRY",
+    "RISK_RR"
+  ],
+  "SetupGrade": [
+    "A+",
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "EvaluationOutcome": [
+    "UNAVAILABLE",
+    "NO_TRADE",
+    "WAIT",
+    "CONFIRMED_PENDING_GATES",
+    "CONFIRMED_AWAITING_AUTHORITY"
+  ],
+  "RiskStatus": [
+    "NOT_CONFIGURED",
+    "INVALID_PROFILE",
+    "LOCKED",
+    "SIZE_UNVERIFIED",
+    "CLEAR",
+    "WITHIN_LIMITS",
+    "UNAVAILABLE"
+  ],
+  "RiskProfileName": [
+    "CONSERVATIVE",
+    "STANDARD",
+    "AGGRESSIVE",
+    "CUSTOM"
+  ],
+  "RiskLock": [
+    "ACCOUNT_STATE_STALE",
+    "DAILY_LOSS_LIMIT",
+    "WEEKLY_LOSS_LIMIT",
+    "MAX_OPEN_RISK",
+    "MAX_POSITIONS",
+    "MAX_TRADES_PER_DAY",
+    "CONSECUTIVE_LOSSES",
+    "PROP_DAILY_DRAWDOWN",
+    "PROP_TOTAL_DRAWDOWN",
+    "VOLATILITY",
+    "INVALID_STOP",
+    "ADDING_TO_LOSER",
+    "UNSAFE_SPREAD",
+    "INSUFFICIENT_MARGIN",
+    "BELOW_MIN_VOLUME"
+  ],
+  "RiskWarning": [
+    "RISK_REDUCED_BY_LIMITS",
+    "CORRELATED_EXPOSURE",
+    "USER_SUPPLIED_SPEC",
+    "SPEC_INCONSISTENT",
+    "CONVERSION_UNAVAILABLE",
+    "LEVERAGE_NOT_SET",
+    "SPREAD_UNKNOWN",
+    "VOLATILITY_UNAVAILABLE",
+    "VOLATILITY_NOT_CHECKED",
+    "ACCOUNT_STATE_NOT_PROVIDED",
+    "NEWS_NOT_EVALUATED"
+  ],
+  "AlertCategory": [
+    "INFORMATIONAL",
+    "WATCH",
+    "SETUP",
+    "ENTRY",
+    "RISK",
+    "MANAGEMENT",
+    "CRITICAL"
+  ],
+  "AlertPriority": [
+    "LOW",
+    "MEDIUM",
+    "HIGH",
+    "CRITICAL"
+  ],
+  "AlertType": [
+    "LIQUIDITY_APPROACHING",
+    "LIQUIDITY_SWEEP",
+    "LIQUIDITY_RUN",
+    "EQUAL_LEVEL_CREATED",
+    "KEY_LEVEL_INTERACTION",
+    "SESSION_LIQUIDITY_EVENT",
+    "STRUCTURE_BREAK",
+    "DISPLACEMENT",
+    "NO_WICK_EVENT",
+    "NO_WICK_REBALANCE",
+    "FVG_CREATED",
+    "FVG_TOUCHED",
+    "FVG_INVALIDATED",
+    "SETUP_ARMED",
+    "ENTRY_ZONE_APPROACHING",
+    "ENTRY_ZONE_TOUCHED",
+    "ENTRY_CONFIRMED_PENDING_GATES",
+    "ENTRY_MISSED",
+    "EARLY_ENTRY_WARNING",
+    "SETUP_INVALIDATED",
+    "SETUP_EXPIRED",
+    "SESSION_CHANGE",
+    "RISK_LOCK",
+    "RISK_LOCK_CLEARED",
+    "DATA_UNAVAILABLE",
+    "DATA_RESTORED",
+    "MONITOR_FAILURE",
+    "READY",
+    "NEWS_COUNTDOWN",
+    "NEWS_BLACKOUT",
+    "NEWS_CLEARED",
+    "MACRO_SHIFT"
+  ],
+  "ReadyWatchState": [
+    "WAITING",
+    "GATES_PENDING",
+    "UNAVAILABLE",
+    "FIRED"
+  ],
+  "ConditionStatus": [
+    "MET",
+    "MISSING",
+    "NOT_EVALUATED"
+  ],
+  "AssistantIntent": [
+    "ANALYZE",
+    "WHY_WAITING",
+    "WHY_NOT_DIRECTION",
+    "LIQUIDITY",
+    "DOL",
+    "SCORE_CHANGE",
+    "NO_WICK",
+    "INVALIDATION",
+    "TRADE_PLAN",
+    "RISK",
+    "SESSION",
+    "A_PLUS_SETUPS",
+    "COMPARE",
+    "BACKTEST",
+    "MACRO",
+    "CREATE_ALERT",
+    "EXPLAIN_TERM",
+    "HELP",
+    "NEWS",
+    "JOURNAL"
+  ],
+  "EducationLevel": [
+    "BEGINNER",
+    "INTERMEDIATE",
+    "ADVANCED",
+    "PROFESSIONAL"
+  ],
+  "AssistantProvider": [
+    "DETERMINISTIC",
+    "ANTHROPIC"
+  ],
+  "GuardStatus": [
+    "PASSED",
+    "FALLBACK",
+    "NOT_APPLICABLE"
+  ],
+  "ToolStatus": [
+    "OK",
+    "UNAVAILABLE",
+    "PROPOSED",
+    "REJECTED"
+  ],
+  "NewsState": [
+    "CLEAR",
+    "CAUTION",
+    "BLACKOUT",
+    "POST_NEWS_WAIT",
+    "NORMALIZED",
+    "UNAVAILABLE"
+  ],
+  "EventImportance": [
+    "LOW",
+    "MEDIUM",
+    "HIGH",
+    "EXTREME"
+  ],
+  "EventStatus": [
+    "UPCOMING",
+    "IMMINENT",
+    "RELEASED",
+    "REVISED",
+    "COMPLETED",
+    "CANCELLED",
+    "DELAYED"
+  ],
+  "MacroState": [
+    "STRONGLY_SUPPORTIVE",
+    "SUPPORTIVE",
+    "NEUTRAL",
+    "CONFLICT",
+    "STRONG_CONFLICT",
+    "UNAVAILABLE"
+  ],
+  "MacroBias": [
+    "BULLISH",
+    "BEARISH",
+    "NEUTRAL",
+    "UNAVAILABLE"
+  ],
+  "MacroSeriesId": [
+    "DXY",
+    "US2Y",
+    "US10Y",
+    "US10Y_REAL",
+    "VIX"
+  ],
+  "SeriesDirection": [
+    "UP",
+    "DOWN",
+    "FLAT"
+  ],
+  "CorrelationRegime": [
+    "ALIGNED",
+    "WEAK",
+    "INVERTED",
+    "UNAVAILABLE"
+  ],
+  "JournalEntryKind": [
+    "TRADE",
+    "NO_TRADE",
+    "MISSED_ENTRY"
+  ],
+  "JournalStatus": [
+    "OPEN",
+    "CLOSED"
+  ],
+  "TradeResult": [
+    "FULL_WIN",
+    "PARTIAL_WIN",
+    "BREAK_EVEN",
+    "FULL_LOSS",
+    "PARTIAL_LOSS",
+    "MANUAL_EXIT",
+    "INVALIDATION_EXIT",
+    "NEWS_EXIT",
+    "TRAILING_STOP_EXIT",
+    "MISSED_ENTRY",
+    "NO_TRADE"
+  ],
+  "ExitReason": [
+    "TARGET",
+    "STOP",
+    "BREAK_EVEN_STOP",
+    "MANUAL",
+    "INVALIDATION",
+    "NEWS",
+    "TRAILING_STOP"
+  ],
+  "ProcessClassification": [
+    "VALID_WIN",
+    "BAD_PROCESS_WIN",
+    "VALID_LOSS",
+    "PROCESS_ERROR"
+  ],
+  "RuleViolation": [
+    "TRADED_ON_UNAVAILABLE_DECISION",
+    "TRADED_DURING_NEWS_BLACKOUT",
+    "TRADED_WHILE_RISK_LOCKED",
+    "NO_CONFIRMED_PLAN",
+    "AGAINST_PLAN_DIRECTION",
+    "CHASED_ENTRY",
+    "RISK_ABOVE_LIMIT",
+    "MOVED_STOP",
+    "NO_STOP_PLACED",
+    "OVERSIZED_POSITION",
+    "EXITED_EARLY_WITHOUT_REASON",
+    "REVENGE_TRADE",
+    "OTHER"
+  ],
+  "SnapshotIntegrity": [
+    "VERIFIED",
+    "TAMPERED"
+  ],
+  "SnapshotTiming": [
+    "PRE_ENTRY",
+    "POST_ENTRY",
+    "NOT_APPLICABLE"
+  ],
+  "ExtremeSource": [
+    "MANUAL",
+    "CANDLES",
+    "UNAVAILABLE"
+  ],
+  "PaperEntryType": [
+    "MARKET",
+    "LIMIT"
+  ],
+  "PaperSource": [
+    "MANUAL",
+    "ENGINE_PLAN"
+  ],
+  "PaperStatus": [
+    "PENDING",
+    "OPEN",
+    "CLOSED",
+    "EXPIRED",
+    "CANCELLED"
+  ],
+  "PaperEventType": [
+    "CREATED",
+    "FILLED",
+    "STOP_HIT",
+    "TARGET_HIT",
+    "CLOSED_MANUALLY",
+    "EXPIRED",
+    "CANCELLED"
+  ],
+  "SampleSizeLabel": [
+    "INSUFFICIENT",
+    "LIMITED",
+    "MODERATE",
+    "STRONGER_EVIDENCE"
+  ],
+  "AnalyticsSource": [
+    "JOURNAL",
+    "PAPER"
+  ],
+  "BacktestStatus": [
+    "QUEUED",
+    "RUNNING",
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED"
+  ],
+  "BacktestTradeStatus": [
+    "CLOSED",
+    "EXPIRED",
+    "SKIPPED_OVERLAP",
+    "OPEN_AT_END"
+  ],
+  "ReplayMode": [
+    "MANUAL",
+    "GUIDED",
+    "BLIND",
+    "QUIZ"
+  ],
+  "QuizQuestionType": [
+    "NEXT_BARS_DIRECTION",
+    "LEVEL_FIRST",
+    "SETUP_PROGRESS"
+  ],
+  "QuizGrade": [
+    "CORRECT",
+    "INCORRECT",
+    "VOID"
+  ]
+}

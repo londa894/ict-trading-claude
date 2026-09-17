@@ -1,0 +1,13 @@
+{
+  "$comment": "Phase 9 risk management defaults (spec STEP 6). Broker-free: the account profile and account state are entered manually in a server-side file that is never committed. Presets are research defaults, not advice. hardLimits cap every profile, including CUSTOM. Risk only shrinks after losses (no martingale). Any change must bump strategyVersion.",
+  "profiles": {
+    "CONSERVATIVE": { "riskPerTradePct": 0.5, "dailyRiskLimitPct": 1.5, "weeklyRiskLimitPct": 3.0, "maxOpenRiskPct": 1.0, "maxTradesPerDay": 2, "maxPositions": 1, "maxConsecutiveLosses": 2 },
+    "STANDARD": { "riskPerTradePct": 1.0, "dailyRiskLimitPct": 3.0, "weeklyRiskLimitPct": 6.0, "maxOpenRiskPct": 2.0, "maxTradesPerDay": 3, "maxPositions": 2, "maxConsecutiveLosses": 3 },
+    "AGGRESSIVE": { "riskPerTradePct": 2.0, "dailyRiskLimitPct": 5.0, "weeklyRiskLimitPct": 10.0, "maxOpenRiskPct": 4.0, "maxTradesPerDay": 5, "maxPositions": 3, "maxConsecutiveLosses": 4 }
+  },
+  "hardLimits": { "riskPerTradePct": 2.0, "dailyRiskLimitPct": 6.0, "weeklyRiskLimitPct": 12.0, "maxOpenRiskPct": 6.0, "maxTradesPerDay": 10, "maxPositions": 5, "maxConsecutiveLosses": 5 },
+  "volatility": { "timeframe": "M15", "atrPeriod": 14, "baselineBars": 96, "lockRatio": 2.5 },
+  "maxSpreadToStopPct": 10.0,
+  "specConsistencyTolerancePct": 1.0,
+  "conversionMaxAgeHours": 24
+}

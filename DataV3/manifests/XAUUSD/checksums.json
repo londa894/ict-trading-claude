@@ -1,0 +1,55 @@
+{
+  "symbol": "XAUUSD",
+  "datasetVersion": "XAUUSD/1.1.0",
+  "strategyVersion": "3.0.0-m0a",
+  "rawUnchanged": true,
+  "rawFiles": [
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\15M\\XAU_15m_data.csv",
+      "sha256": "a48336b48c030bc407a5b53123fa46b328b74215bd7865f16890b3147a3d70b6",
+      "bytes": 25608537
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\1D\\XAU_1d_data.csv",
+      "sha256": "86a52838d03a524d378e08e3caabdc5869ddaebf915b688feb794b05b58b71ca",
+      "bytes": 297131
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\1H\\XAU_1h_data.csv",
+      "sha256": "f143104b6ecd5634d82dcf2805711254c4d2e771cae84d742a21543791bca954",
+      "bytes": 6556565
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\1M\\XAU_1m_data.csv",
+      "sha256": "996bc9d249a3d57b29f31efe5d9ed7429486fd935ef4ed2dd664ea26dc8e6cd7",
+      "bytes": 348182728
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\1W\\XAU_1w_data.csv",
+      "sha256": "77def6990c3292b7fb52ccca043872eb4f88c4764a9dce59eb51f01c225b9f68",
+      "bytes": 61191
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\30M\\XAU_30m_data.csv",
+      "sha256": "5d1689c1d06b11653f3cd88ca38f44c3e6cfb208aa49de0df73d355d1e7f1435",
+      "bytes": 12972983
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\4H\\XAU_4h_data.csv",
+      "sha256": "4b2fea68d3b67d515b3a042e877f72f3e60d660cb77b3f597ca7a925732dc0f4",
+      "bytes": 1746277
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\5M\\XAU_5m_data.csv",
+      "sha256": "9b0f8e72f8688da0d12a771b7365af2bb6f5484d62f4aa965734296e12bce3c2",
+      "bytes": 74361143
+    },
+    {
+      "file": "C:\\Users\\Londa\\OneDrive\\Documents\\ICT Trading Claude\\Data\\raw\\XAUUSD\\MONTH\\XAU_1Month_data.csv",
+      "sha256": "134e58318ac5223a5c0f69dcab3d49e76c78476ef1271f5507e294ccdf304dbe",
+      "bytes": 14380
+    }
+  ],
+  "generatedAt": "2026-09-16T23:46:51.340548+00:00",
+  "note": "checksums only (M0a); full validation verdict is produced in M0b"
+}

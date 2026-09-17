@@ -1,0 +1,29 @@
+You are rebuilding the Forex & Metals ICT/SMC Trading Command Center from scratch.
+
+Read CODEX_MASTER_BUILD_SPEC.md in full before writing code.
+
+Rules:
+- Do not reuse any prior generated repository.
+- Start from an empty project.
+- Build only Phase 0 first.
+- Do not skip ahead.
+- Broker-free.
+- No order execution.
+- Independent market-data architecture.
+- TradingView Lightweight Charts is renderer-only.
+- Deterministic strategy logic.
+- AI explains structured outputs; it never invents market facts.
+- XAUUSD is the first deeply validated market.
+- Fail safe to WAIT / BLOCKED / UNAVAILABLE when critical data is uncertain.
+- Add tests before moving to the next phase.
+- Update BUILD_STATUS.md after each phase.
+
+Before coding Phase 0:
+1. Show the proposed repository tree.
+2. List dependencies and why each is needed.
+3. List Phase 0 acceptance criteria.
+4. Then implement Phase 0.
+5. Run all tests/build checks.
+6. Stop and report results.
+
+Do not start Phase 1 automatically.

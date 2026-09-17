@@ -1,0 +1,13 @@
+{
+  "$comment": "Phase 18 backtesting V1 (spec STEP 10). Sequential replay of the live setup engine on closed historical bars; fills by the paper engine with assumed costs. Research only: no parameters are fitted, risk/news/authority gates are not applied. Any change must bump strategyVersion.",
+  "maxRangeDays": 14,
+  "maxVariants": 2,
+  "maxSegments": 6,
+  "maxConcurrentPositions": 1,
+  "monteCarlo": {
+    "resamples": 1000,
+    "seed": 18
+  },
+  "progressEverySteps": 10,
+  "maxCostMultiplier": 5
+}

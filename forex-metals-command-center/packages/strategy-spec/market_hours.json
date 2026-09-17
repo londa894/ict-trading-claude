@@ -1,0 +1,19 @@
+{
+  "$comment": "Weekly trading hours expressed in America/New_York local time (DST-aware conversion happens in code). Holidays and provider-specific early closes are NOT modelled in Phase 0; they surface as MISSING_BARS warnings (fail-safe direction).",
+  "timezone": "America/New_York",
+  "METAL": {
+    "weekOpen": { "weekday": "SUNDAY", "time": "18:00" },
+    "weekClose": { "weekday": "FRIDAY", "time": "17:00" },
+    "dailyBreak": { "start": "17:00", "end": "18:00" }
+  },
+  "FX_MAJOR": {
+    "weekOpen": { "weekday": "SUNDAY", "time": "17:00" },
+    "weekClose": { "weekday": "FRIDAY", "time": "17:00" },
+    "dailyBreak": null
+  },
+  "FX_CROSS": {
+    "weekOpen": { "weekday": "SUNDAY", "time": "17:00" },
+    "weekClose": { "weekday": "FRIDAY", "time": "17:00" },
+    "dailyBreak": null
+  }
+}

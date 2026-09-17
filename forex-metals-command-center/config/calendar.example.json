@@ -1,0 +1,45 @@
+{
+  "source": "manually maintained from a licensed economic calendar (example values)",
+  "fetchedAt": "2026-09-14T06:00:00Z",
+  "coverageStart": "2026-09-13T00:00:00Z",
+  "coverageEnd": "2026-09-21T00:00:00Z",
+  "events": [
+    {
+      "id": "2026-09-15-US-RETAIL-SALES",
+      "country": "United States",
+      "currency": "USD",
+      "name": "Retail Sales m/m",
+      "scheduledTime": "2026-09-15T12:30:00Z",
+      "importance": "HIGH",
+      "forecast": "0.3%",
+      "previous": "0.5%"
+    },
+    {
+      "id": "2026-09-16-US-FOMC",
+      "country": "United States",
+      "currency": "USD",
+      "name": "FOMC Rate Decision",
+      "scheduledTime": "2026-09-16T18:00:00Z",
+      "importance": "EXTREME"
+    },
+    {
+      "id": "2026-09-17-GB-BOE",
+      "country": "United Kingdom",
+      "currency": "GBP",
+      "name": "BoE Rate Decision",
+      "scheduledTime": "2026-09-17T11:00:00Z",
+      "importance": "EXTREME"
+    },
+    {
+      "id": "2026-09-18-EU-CPI-FINAL",
+      "country": "Euro Area",
+      "currency": "EUR",
+      "name": "CPI y/y (final)",
+      "scheduledTime": "2026-09-18T09:00:00Z",
+      "importance": "MEDIUM",
+      "forecast": "2.1%",
+      "previous": "2.1%",
+      "status": "UPCOMING"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "$comment": "Phase 10 watchlist & scanner. The scan runs the same Master Decision pipeline per symbol (one decision object everywhere). Ranking orders what deserves attention; it is never a trade signal. Any change must bump strategyVersion.",
+  "cacheSeconds": 60,
+  "maxSymbols": 12,
+  "setupProgress": [
+    "DISCOVERED",
+    "WATCH",
+    "SETUP_FORMING",
+    "LIQUIDITY_EVENT",
+    "WAITING_FOR_MSS",
+    "SETUP_ARMED",
+    "WAITING_FOR_RETRACEMENT",
+    "ENTRY_ZONE_APPROACHING",
+    "ENTRY_ZONE_TOUCHED",
+    "WAITING_FOR_CONFIRMATION",
+    "BLOCKED"
+  ]
+}

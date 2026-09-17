@@ -1,0 +1,91 @@
+{
+  "$comment": "Phase 6 Session & Time research defaults (not optimised). All window times are America/New_York wall time, DST-aware in code; every boundary must be aligned to the session source timeframe. Any change must bump strategyVersion.",
+  "timezone": "America/New_York",
+  "displayTimezones": [
+    "UTC",
+    "America/New_York",
+    "Europe/London"
+  ],
+  "sourceTimeframe": "M15",
+  "sourceBars": 1000,
+  "poolSourceBars": 400,
+  "sessions": {
+    "ASIA": {
+      "start": "20:00",
+      "end": "00:00"
+    },
+    "LONDON": {
+      "start": "02:00",
+      "end": "05:00"
+    },
+    "NY_AM": {
+      "start": "08:30",
+      "end": "12:00"
+    },
+    "NY_PM": {
+      "start": "13:30",
+      "end": "16:00"
+    },
+    "LONDON_CLOSE": {
+      "start": "10:00",
+      "end": "12:00"
+    }
+  },
+  "killZones": {
+    "LONDON_KZ": {
+      "start": "02:00",
+      "end": "05:00"
+    },
+    "NY_AM_KZ": {
+      "start": "07:00",
+      "end": "10:00"
+    },
+    "NY_PM_KZ": {
+      "start": "13:30",
+      "end": "16:00"
+    }
+  },
+  "timeQuality": {
+    "$comment": "Best quality of the active windows wins. Outside every window: LOW_QUALITY. Market not OPEN: AVOID.",
+    "LONDON_KZ": "IDEAL",
+    "NY_AM_KZ": "IDEAL",
+    "NY_PM_KZ": "ACCEPTABLE",
+    "LONDON_CLOSE": "ACCEPTABLE",
+    "ASIA": "LOW_QUALITY",
+    "outside": "LOW_QUALITY"
+  },
+  "asianRange": {
+    "lookbackSessions": 10,
+    "minSessions": 5,
+    "tightBelow": 0.6,
+    "normalBelow": 1.3,
+    "expandedBelow": 2.0
+  },
+  "adr": {
+    "periodDays": 14,
+    "consolidatingBelowPct": 25,
+    "earlyBelowPct": 50,
+    "activeBelowPct": 80,
+    "lateBelowPct": 110
+  },
+  "judas": {
+    "$comment": "A sweep of the same trading day's COMPLETE Asian high/low inside these sessions.",
+    "sessions": [
+      "LONDON",
+      "NY_AM"
+    ]
+  },
+  "liquidityPools": {
+    "$comment": "COMPLETE session instances turned into liquidity pools, known at window end.",
+    "sessions": [
+      "ASIA",
+      "LONDON",
+      "NY_AM",
+      "NY_PM"
+    ],
+    "instancesPerSession": 2
+  },
+  "decisionContext": {
+    "timeframe": "M15"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "$comment": "Phase 4 displacement + FVG/IFVG research defaults (not optimised). ATR period from structure.json. Any change must bump strategyVersion.",
+  "displacement": {
+    "minBodyPct": 0.5,
+    "maxLegCandles": 3,
+    "gradesAtr": { "WEAK": 1.0, "MODERATE": 1.5, "STRONG": 2.0, "EXCEPTIONAL": 3.0 },
+    "strongMinAvgBodyPct": 0.65,
+    "qualifierMinGrade": "MODERATE",
+    "qualifierLookbackBars": 3
+  },
+  "fvg": {
+    "minSizeAtr": 0.1,
+    "touchToleranceAtr": 0.02,
+    "touchMaxFillPct": 5,
+    "halfFillPct": 50,
+    "invalidationRule": "CLOSE_THROUGH"
+  },
+  "ifvg": {
+    "confirmWindowBars": 5,
+    "acceptanceCloses": 2,
+    "acceptanceExtensionAtr": 0.25,
+    "displacementMinGrade": "MODERATE"
+  },
+  "quality": {
+    "$comment": "Weights sum to 100. A ranking of zones, not a probability.",
+    "sizeMax": 40,
+    "sizeFullAtr": 1.5,
+    "displacement": { "NONE": 0, "WEAK": 10, "MODERATE": 20, "STRONG": 25, "EXCEPTIONAL": 30 },
+    "freshness": { "FRESH": 20, "TOUCHED": 15, "PARTIAL": 10, "HALF": 5, "FULL": 0 },
+    "trendAlignment": 10
+  },
+  "decisionContext": { "displacementTimeframe": "M15" }
+}

@@ -1,0 +1,14 @@
+{
+  "$comment": "Instrument identity metadata only. Contract/tick specifications are broker/venue specific and are deliberately null: risk sizing must report POSITION_SIZE_UNVERIFIED until a user or verified source supplies them. Never guess.",
+  "instruments": [
+    { "symbol": "XAUUSD", "assetClass": "METAL", "base": "XAU", "quote": "USD", "pricePrecision": 2, "priority": 1, "deeplyValidated": true, "spec": null },
+    { "symbol": "XAGUSD", "assetClass": "METAL", "base": "XAG", "quote": "USD", "pricePrecision": 3, "priority": 2, "deeplyValidated": false, "spec": null },
+    { "symbol": "EURUSD", "assetClass": "FX_MAJOR", "base": "EUR", "quote": "USD", "pricePrecision": 5, "priority": 3, "deeplyValidated": false, "spec": null },
+    { "symbol": "GBPUSD", "assetClass": "FX_MAJOR", "base": "GBP", "quote": "USD", "pricePrecision": 5, "priority": 3, "deeplyValidated": false, "spec": null },
+    { "symbol": "USDJPY", "assetClass": "FX_MAJOR", "base": "USD", "quote": "JPY", "pricePrecision": 3, "priority": 3, "deeplyValidated": false, "spec": null },
+    { "symbol": "USDCHF", "assetClass": "FX_MAJOR", "base": "USD", "quote": "CHF", "pricePrecision": 5, "priority": 3, "deeplyValidated": false, "spec": null },
+    { "symbol": "USDCAD", "assetClass": "FX_MAJOR", "base": "USD", "quote": "CAD", "pricePrecision": 5, "priority": 3, "deeplyValidated": false, "spec": null },
+    { "symbol": "AUDUSD", "assetClass": "FX_MAJOR", "base": "AUD", "quote": "USD", "pricePrecision": 5, "priority": 3, "deeplyValidated": false, "spec": null },
+    { "symbol": "NZDUSD", "assetClass": "FX_MAJOR", "base": "NZD", "quote": "USD", "pricePrecision": 5, "priority": 3, "deeplyValidated": false, "spec": null }
+  ]
+}

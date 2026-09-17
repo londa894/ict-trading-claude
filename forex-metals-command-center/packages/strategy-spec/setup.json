@@ -1,0 +1,25 @@
+{
+  "$comment": "Phase 7 core setup state machine research defaults (not optimised). One setup model: liquidity sweep -> displacement MSS -> retracement into the leg's FVG. Any change must bump strategyVersion.",
+  "setupTimeframe": "M15",
+  "setupBars": 300,
+  "bias": {
+    "$comment": "Setup bias = the common direction of the last confirmed EXTERNAL BOS/MSS on every timeframe, as known at each candle's close.",
+    "timeframes": ["H4", "H1"],
+    "bars": 300
+  },
+  "formingApproachAtr": 1.0,
+  "sweepEventTypes": ["SWEEP", "RECLAIM"],
+  "mss": {
+    "breakTypes": ["MSS", "CHOCH"],
+    "requireDisplacement": true,
+    "windowBars": 12
+  },
+  "retracement": {
+    "zoneGraceBars": 2,
+    "approachAtr": 0.5,
+    "windowBars": 24
+  },
+  "expireAtTradingDayEnd": true,
+  "po3": { "manipulationAdrPct": 15, "distributionAdrPct": 15 },
+  "decisionContext": { "timeframe": "M15" }
+}

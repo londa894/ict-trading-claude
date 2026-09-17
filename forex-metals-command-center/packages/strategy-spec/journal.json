@@ -1,0 +1,17 @@
+{
+  "$comment": "Phase 15 journal V1 (spec STEP 10 journal part). Research defaults. Analytics (sample-size labels, expectancy ...) is Phase 17. Any change must bump strategyVersion.",
+  "breakEvenToleranceR": 0.1,
+  "fullWinToleranceFraction": 0.1,
+  "fullLossToleranceR": 0.1,
+  "chaseToleranceR": 0.25,
+  "postEntrySnapshotMinutes": 5,
+  "maxOpenDays": 30,
+  "maxNotesLength": 2000,
+  "listDefaultLimit": 50,
+  "listMaxLimit": 200,
+  "extremesTimeframes": [
+    "M5",
+    "M15",
+    "H1"
+  ]
+}

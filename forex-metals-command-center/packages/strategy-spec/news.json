@@ -1,0 +1,21 @@
+{
+  "$comment": "Phase 13 economic calendar and news gate (spec STEP 7). Windows are research defaults (not calibrated). A strict BLACKOUT is a hard blocker; when the calendar cannot prove the next hours are clear the news state is UNAVAILABLE and the decision stays blocked. Any change must bump strategyVersion.",
+  "relevantCurrencies": {
+    "METAL": "QUOTE",
+    "FX_MAJOR": "BASE_AND_QUOTE",
+    "FX_CROSS": "BASE_AND_QUOTE"
+  },
+  "windows": {
+    "EXTREME": { "blackoutBeforeMinutes": 30, "blackoutAfterMinutes": 30, "postWaitMinutes": 15, "cautionLeadMinutes": 120 },
+    "HIGH": { "blackoutBeforeMinutes": 15, "blackoutAfterMinutes": 15, "postWaitMinutes": 10, "cautionLeadMinutes": 60 },
+    "MEDIUM": { "blackoutBeforeMinutes": 0, "blackoutAfterMinutes": 0, "postWaitMinutes": 0, "cautionLeadMinutes": 15 }
+  },
+  "normalizedMinutes": 30,
+  "imminentMinutes": 15,
+  "delayedMaxMinutes": 120,
+  "calendarMaxAgeHours": 24,
+  "requiredLookaheadHours": 24,
+  "listBeforeHours": 6,
+  "listAfterHours": 24,
+  "countdownMinutes": [60, 15]
+}

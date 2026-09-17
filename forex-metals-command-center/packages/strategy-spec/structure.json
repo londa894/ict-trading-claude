@@ -1,0 +1,38 @@
+{
+  "$comment": "Phase 2 market-structure research defaults (not optimised). Any change must bump strategyVersion.",
+  "pivotLength": {
+    "INTERNAL": 3,
+    "EXTERNAL": 10
+  },
+  "equalToleranceAtr": 0.1,
+  "atrPeriod": 14,
+  "rangingBarsWithoutBreak": {
+    "INTERNAL": 40,
+    "EXTERNAL": 120
+  },
+  "minCandles": 50,
+  "breakConfirmation": "CANDLE_CLOSE",
+  "decisionContext": {
+    "$comment": "XAUUSD default: HTF bias from D1+H4 external structure; structure event from M15 (confirmation timeframe).",
+    "htfTimeframes": [
+      "D1",
+      "H4"
+    ],
+    "confirmationTimeframe": "M15",
+    "alignmentTimeframes": [
+      "D1",
+      "H4",
+      "H1",
+      "M15",
+      "M5"
+    ],
+    "limits": {
+      "$comment": "Candles analysed per timeframe for decision/alignment. D1 is bounded because it is derived from 24 H1 bars each.",
+      "D1": 120,
+      "H4": 300,
+      "H1": 300,
+      "M15": 300,
+      "M5": 300
+    }
+  }
+}

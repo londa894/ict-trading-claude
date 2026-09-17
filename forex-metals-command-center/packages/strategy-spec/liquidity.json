@@ -1,0 +1,57 @@
+{
+  "$comment": "Phase 3 liquidity (+ Phase 6 session pools) research defaults (not optimised). ATR = ATR(atrPeriod from structure.json) at the evaluated candle. Any change must bump strategyVersion.",
+  "touchToleranceAtr": 0.05,
+  "approachDistanceAtr": 0.5,
+  "equal": {
+    "toleranceAtr": 0.1,
+    "minBarsApart": 3
+  },
+  "sweep": {
+    "rule": "CLOSE_BACK_INSIDE_SAME_CANDLE",
+    "failureWindowBars": 3
+  },
+  "break": {
+    "acceptanceWindowBars": 3,
+    "runExtensionAtr": 0.5
+  },
+  "keyLevels": {
+    "days": 5,
+    "weeks": 2
+  },
+  "magnet": {
+    "$comment": "Weights sum to 100. The score ranks liquidity pools; it is not a probability.",
+    "type": {
+      "PWH": 30,
+      "PWL": 30,
+      "PDH": 25,
+      "PDL": 25,
+      "EQH": 25,
+      "EQL": 25,
+      "EXTERNAL_SWING": 20,
+      "INTERNAL_SWING": 10,
+      "SESSION": 20
+    },
+    "clusterMax": 15,
+    "clusterPerMember": 5,
+    "touchPoints": 2,
+    "proximityMax": 30,
+    "proximityZeroAtr": 10,
+    "stackMax": 15,
+    "stackPerPool": 5,
+    "stackToleranceAtr": 0.25,
+    "trendAlignment": 10
+  },
+  "dol": {
+    "highMargin": 25,
+    "moderateMargin": 15,
+    "lowMargin": 8,
+    "distinctPriceAtr": 0.25
+  },
+  "qualifierLookbackBars": 20,
+  "decisionContext": {
+    "$comment": "XAUUSD default: DOL from H1 (HTF location), latest liquidity event from M15 (confirmation).",
+    "dolTimeframe": "H1",
+    "eventTimeframe": "M15",
+    "keyLevelTimeframe": "D1"
+  }
+}

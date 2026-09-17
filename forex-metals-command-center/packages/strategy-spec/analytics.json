@@ -1,0 +1,11 @@
+{
+  "$comment": "Phase 17 analytics V1 (spec STEP 10). Statistics describe recorded history only: never a probability, a guarantee or a trade signal. Sample-size labels follow the spec. Any change must bump strategyVersion.",
+  "sampleSizeLabels": {
+    "LIMITED": 30,
+    "MODERATE": 100,
+    "STRONGER_EVIDENCE": 300
+  },
+  "bestGroupMinLabel": "LIMITED",
+  "equityCurveMaxPoints": 500,
+  "disclaimer": "Recorded history only. Not a probability, forecast, guarantee or trade signal; small samples are labelled."
+}

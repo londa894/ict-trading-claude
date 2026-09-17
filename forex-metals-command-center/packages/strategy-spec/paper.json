@@ -1,0 +1,55 @@
+{
+  "$comment": "Phase 16 paper trading (broker-free simulation on the independent market data; never an authorization). Costs are ASSUMPTIONS in price units, not broker specifications: replace them with your venue's real costs. Candles are treated as mid prices. Any change must bump strategyVersion.",
+  "executionTimeframe": "M5",
+  "pendingExpiryBars": 12,
+  "maxBarsPerAdvance": 1000,
+  "advanceSeconds": 60,
+  "maxOpenSims": 50,
+  "assumedCosts": {
+    "XAUUSD": {
+      "spread": 0.3,
+      "slippage": 0.05,
+      "commission": 0.0
+    },
+    "XAGUSD": {
+      "spread": 0.03,
+      "slippage": 0.005,
+      "commission": 0.0
+    },
+    "EURUSD": {
+      "spread": 0.00012,
+      "slippage": 2e-05,
+      "commission": 0.0
+    },
+    "GBPUSD": {
+      "spread": 0.00015,
+      "slippage": 3e-05,
+      "commission": 0.0
+    },
+    "USDJPY": {
+      "spread": 0.015,
+      "slippage": 0.003,
+      "commission": 0.0
+    },
+    "USDCHF": {
+      "spread": 0.00016,
+      "slippage": 3e-05,
+      "commission": 0.0
+    },
+    "USDCAD": {
+      "spread": 0.00018,
+      "slippage": 3e-05,
+      "commission": 0.0
+    },
+    "AUDUSD": {
+      "spread": 0.00013,
+      "slippage": 2e-05,
+      "commission": 0.0
+    },
+    "NZDUSD": {
+      "spread": 0.00018,
+      "slippage": 3e-05,
+      "commission": 0.0
+    }
+  }
+}

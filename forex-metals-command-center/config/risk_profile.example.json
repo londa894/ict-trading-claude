@@ -1,0 +1,30 @@
+{
+  "account": {
+    "balance": 10000,
+    "currency": "USD",
+    "profile": "STANDARD",
+    "leverage": 100
+  },
+  "state": {
+    "tradingDay": "2026-09-14",
+    "realizedPnlToday": 0,
+    "realizedPnlWeek": 0,
+    "tradesToday": 0,
+    "consecutiveLosses": 0,
+    "openPositions": []
+  },
+  "instrumentSpecs": {
+    "XAUUSD": {
+      "symbol": "XAUUSD",
+      "contractSize": 100,
+      "tickSize": 0.01,
+      "tickValue": 1,
+      "minVolume": 0.01,
+      "volumeStep": 0.01,
+      "quoteCurrency": "USD",
+      "typicalSpread": 0.3,
+      "platformPipSize": 0.1
+    }
+  },
+  "conversionRates": []
+}

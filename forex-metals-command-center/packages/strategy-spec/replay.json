@@ -1,0 +1,20 @@
+{
+  "$comment": "Phase 19 replay (spec STEP 10: Manual / Guided / Blind / Quiz, hide future). Education only. Sessions are in memory. Any change must bump strategyVersion.",
+  "timeframes": [
+    "M5",
+    "M15",
+    "H1"
+  ],
+  "windowBars": 300,
+  "maxStepBars": 96,
+  "quizHorizonBars": 6,
+  "levelAtrPeriod": 14,
+  "maxSessions": 20,
+  "idleTtlHours": 6,
+  "blind": {
+    "priceScaleMin": 0.6,
+    "priceScaleMax": 1.4,
+    "minWeekShift": 520,
+    "maxWeekShift": 1560
+  }
+}

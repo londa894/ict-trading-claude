@@ -1,0 +1,21 @@
+.env
+# Manual risk profile (balance, P/L, positions): private, never committed
+config/*.local.json
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.db
+
+# Node / Next
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+coverage/

@@ -1,0 +1,2607 @@
+From 9250c6255fbd621827e9d8f7e5b9ae20a2652dcb Mon Sep 17 00:00:00 2001
+From: Londa <your-github-email@example.com>
+Date: Thu, 17 Sep 2026 01:22:12 +0000
+Subject: [PATCH] feat: add research-only Silver Bullet model
+
+---
+ BUILD_STATUS.md                               |   4 +-
+ README.md                                     |   2 +-
+ apps/web/src/lib/setups.ts                    |   9 +-
+ docs/phases/PHASE_23.md                       |  53 +++
+ packages/shared-types/src/index.ts            |  11 +-
+ packages/strategy-spec/README.md              |   1 +
+ packages/strategy-spec/enums.json             |   3 +-
+ packages/strategy-spec/silver_bullet.json     |  19 +
+ packages/strategy-spec/strategy_version.json  |   9 +-
+ services/api/app/api/routes.py                |  22 ++
+ services/api/app/domain/enums.py              |   5 +-
+ services/api/app/main.py                      |  21 +-
+ services/api/app/services/backtest/funnel.py  |   7 +-
+ services/api/app/services/setups/engine.py    |   6 +-
+ services/api/app/services/setups/service.py   |  25 +-
+ .../app/services/silver_bullet/__init__.py    |   0
+ .../api/app/services/silver_bullet/engine.py  | 348 ++++++++++++++++++
+ .../api/app/services/silver_bullet/models.py  | 137 +++++++
+ .../api/app/services/silver_bullet/service.py |  65 ++++
+ services/api/scripts/diag_funnel.py           |  81 ++--
+ services/api/scripts/diag_geometry.py         | 102 +++--
+ services/api/scripts/diag_latency.py          |  86 +++--
+ services/api/scripts/diag_overlap.py          |  37 +-
+ services/api/scripts/diag_overlap4.py         |  22 +-
+ services/api/scripts/diag_overlap5.py         |  36 +-
+ .../api/tests/integration/test_api_and_db.py  |  16 +-
+ .../tests/integration/test_backtest_api.py    |   2 +-
+ .../api/tests/integration/test_macro_api.py   |   2 +-
+ .../tests/integration/test_pd_arrays_api.py   |   2 +-
+ .../tests/unit/test_contracts_providers.py    |   2 +-
+ services/api/tests/unit/test_entry_breaker.py |  98 +++--
+ .../unit/test_entry_conservative_retest.py    |  11 +-
+ services/api/tests/unit/test_entry_ifvg.py    |  89 +++--
+ services/api/tests/unit/test_entry_no_wick.py |  94 +++--
+ services/api/tests/unit/test_silver_bullet.py | 282 ++++++++++++++
+ 35 files changed, 1492 insertions(+), 217 deletions(-)
+ create mode 100644 docs/phases/PHASE_23.md
+ create mode 100644 packages/strategy-spec/silver_bullet.json
+ create mode 100644 services/api/app/services/silver_bullet/__init__.py
+ create mode 100644 services/api/app/services/silver_bullet/engine.py
+ create mode 100644 services/api/app/services/silver_bullet/models.py
+ create mode 100644 services/api/app/services/silver_bullet/service.py
+ create mode 100644 services/api/tests/unit/test_silver_bullet.py
+
+diff --git a/BUILD_STATUS.md b/BUILD_STATUS.md
+index 7f4ec3a..64d649a 100644
+--- a/BUILD_STATUS.md
++++ b/BUILD_STATUS.md
+@@ -27,7 +27,9 @@ Clean rebuild from scratch (no earlier generated code reused). Source of truth:
+ | 19 | Replay | ✅ PASSED (Manual/Guided on the as-of engines; Blind with masked date and prices; quiz graded as of each moment; local hash-chained file) | 0.19.0-phase19 | 2026-09-15 |
+ | 20 | Advanced PD Arrays (first Phase 20+ item) | ✅ PASSED (order/mitigation blocks, breakers, BPR, volume imbalance, dealing ranges, OTE, EntryZoneScore, confluence, delivery phase; context only) | 0.20.0-phase20 | 2026-09-15 |
+ | 21 | Mobile Layout (Phase 20+ item) | ✅ PASSED (HOME / WATCHLIST / CHART / ALERTS / TRADES / AI on narrow screens of this computer; TRADES read-only; presentation only) | 0.21.0-phase21 | 2026-09-15 |
+-| 22+ | Remaining Phase 20+ items: SMT / advanced macro / adaptive No Wick / advanced scoring / playbooks (master spec STEP 15) | ⏸ NOT STARTED — awaiting approval and scoping (SMT needs a second validated dataset) | — | — |
++| 22 | Entry-Model Coverage | ✅ PASSED after baseline repair (IFVG / conservative retest / No-Wick rebalance / breaker remain research-only; default unchanged) | 0.22.3-phase22-breaker | 2026-09-17 |
++| 23 | Silver Bullet Research Model | ✅ PASSED (separate M5 model; three DST-aware New York windows; causal displacement, structural stop, liquidity target, fail-safe ambiguity handling; API; no verdict authority) | 0.23.0-phase23-silver-bullet-research | 2026-09-17 |
++| 24+ | Remaining Phase 20+ items: SMT / advanced macro / adaptive No Wick / advanced scoring / playbooks (master spec STEP 15) | ⏸ NOT STARTED — awaiting approval and scoping (SMT needs a second validated dataset) | — | — |
+ | Step 20 | Adaptive Winning Playbook / Anti-Pattern / Memory Engine | NOT STARTED (requires validated data + strategy engine + validated backtesting) | — | — |
+ 
+ Verdict authority: **FAIL_SAFE_ONLY**. The verdict engine can emit UNAVAILABLE, WAIT or NO_TRADE. Risk (Phase 9) has the final veto
+diff --git a/README.md b/README.md
+index a4a041b..ff745c1 100644
+--- a/README.md
++++ b/README.md
+@@ -61,6 +61,6 @@ Method and XAUUSD findings: `docs/data/HISTORICAL_DATA_ARCHITECTURE.md`.
+   `MARKET_DATA_PROVIDER=historical_file` and `DATA_ROOT`; the data is STALE by nature and the decision stays UNAVAILABLE.
+ - Chart: open `http://localhost:3000/#chart` (5M/15M/1H native; 4H/D built from 1H on the New York close; gaps marked;
+   structure and liquidity overlay toggles; STRUCTURE and LIQUIDITY tabs). API: `GET /api/v1/structure/XAUUSD?timeframe=M15`,
+-  `/api/v1/structure/XAUUSD/alignment`, `GET /api/v1/liquidity/XAUUSD?timeframe=M15` `GET /api/v1/fvg/XAUUSD?timeframe=M15` `GET /api/v1/no-wick/XAUUSD?timeframe=M15` and `GET /api/v1/sessions/XAUUSD?tz=Europe/London`.
++  `/api/v1/structure/XAUUSD/alignment`, `GET /api/v1/liquidity/XAUUSD?timeframe=M15`, `GET /api/v1/fvg/XAUUSD?timeframe=M15`, `GET /api/v1/no-wick/XAUUSD?timeframe=M15`, `GET /api/v1/sessions/XAUUSD?tz=Europe/London`, and the research-only `GET /api/v1/silver-bullet/XAUUSD`.
+ - Web (repo root): `npm install`, then `npm run build --workspace apps/web`, then `npx next start apps/web -p 3000`.
+ - Configuration: `.env.example`. Secrets stay server-side and are never committed.
+diff --git a/apps/web/src/lib/setups.ts b/apps/web/src/lib/setups.ts
+index fac37f3..1a2c90c 100644
+--- a/apps/web/src/lib/setups.ts
++++ b/apps/web/src/lib/setups.ts
+@@ -49,7 +49,14 @@ export const LIFECYCLE = [
+ ];
+ /** Spec STEP 8 grade bands (lower bounds). */
+ export const GRADE_MIN: Record<SetupGrade, number> = { "A+": 90, A: 80, B: 70, C: 60, D: 0 };
+-const MODEL_TIMEFRAME: Record<EntryModel, string> = { LTF_REFINEMENT: "M5", M15_CLOSE: "M15" };
++const MODEL_TIMEFRAME: Record<EntryModel, string> = {
++  LTF_REFINEMENT: "M5",
++  M15_CLOSE: "M15",
++  IFVG: "M5",
++  CONSERVATIVE_RETEST: "M15",
++  NO_WICK_REBALANCE: "M5",
++  BREAKER: "M5",
++};
+ const ARMED_OR_LATER = LIFECYCLE.slice(5);
+ const has = (list: readonly string[], v: unknown) => list.includes(String(v));
+ const t = (v: unknown) => Date.parse(String(v));
+diff --git a/docs/phases/PHASE_23.md b/docs/phases/PHASE_23.md
+new file mode 100644
+index 0000000..f1ff552
+--- /dev/null
++++ b/docs/phases/PHASE_23.md
+@@ -0,0 +1,53 @@
++# Phase 23 — Silver Bullet Research Model
++
++## Goal
++Add Silver Bullet as a deterministic setup family beside `SWEEP_MSS_FVG`, without changing the existing setup engine or granting the new family verdict authority.
++
++## Scope
++- XAUUSD-first, broker-independent research output.
++- M5 closed candles only.
++- America/New_York wall-clock windows, converted with IANA timezone rules:
++  - London: 03:00–04:00
++  - New York AM: 10:00–11:00
++  - New York PM: 14:00–15:00
++- Separate API: `GET /api/v1/silver-bullet/{symbol}`.
++- Verdict authority: `RESEARCH_ONLY`; the system-wide authority remains `FAIL_SAFE_ONLY`.
++- No live execution and no claim of profitability.
++
++## Deterministic Rules
++1. A classic FVG must become known inside one of the three windows. Formation at the exact end boundary is excluded.
++2. The FVG must meet the configured quality floor and reference a same-direction, causally known displacement of at least the configured grade.
++3. Entry is the FVG proximal edge. A fill can only occur on a later closed M5 candle and before the window ends.
++4. Invalidation is the latest causally known opposing swing, buffered by ATR. Missing or impossible stop geometry blocks the candidate.
++5. The target is the nearest causally known, untaken same-direction liquidity pool beyond entry. Missing target liquidity blocks the candidate.
++6. R:R below the configured minimum blocks the candidate.
++7. Target reached before retracement produces `ENTRY_MISSED`.
++8. A candle that can contain both entry and target, or entry and stop, is intrabar-ambiguous and therefore `BLOCKED`.
++9. A data gap between formation and entry/window end is `BLOCKED`, never silently treated as expiry.
++10. An unfilled candidate expires at the end of its own Silver Bullet window.
++
++## States
++- `ARMED`: valid geometry; waiting for retracement before the window end.
++- `FILLED`: a later closed M5 candle traded through the proximal edge.
++- `ENTRY_MISSED`: target liquidity was reached first.
++- `EXPIRED`: no retracement before the window ended.
++- `BLOCKED`: causal evidence, geometry, data integrity, or intrabar ordering is unsafe.
++
++## Configuration
++`packages/strategy-spec/silver_bullet.json` owns the windows and untuned research defaults. Any modification requires a strategy-version bump.
++
++## Tests
++- Winter/summer DST conversion.
++- Exact start/end boundaries.
++- Formation/fill causality.
++- Displacement, structural-stop, liquidity-target, and minimum-R:R gates.
++- Expiry, data gaps, target-before-entry, and intrabar ambiguity.
++- API separation, research-only authority, unknown symbol, and invalid bar count.
++
++## Known Limitations
++- Real XAUUSD historical data is not included in this clone, so no out-of-sample expectancy, profit factor, drawdown, or robustness claim is made here.
++- Filled-trade outcome simulation and walk-forward reporting are not yet connected to the existing backtest job system.
++- Source-video transcripts could not be retrieved from this server because YouTube blocked the cloud IP. Ambiguous Silver Bullet interpretations were not guessed; only explicit project rules were encoded as configurable behavior.
++
++## Strategy Version
++`0.23.0-phase23-silver-bullet-research`.
+diff --git a/packages/shared-types/src/index.ts b/packages/shared-types/src/index.ts
+index 3f7be03..2fec230 100644
+--- a/packages/shared-types/src/index.ts
++++ b/packages/shared-types/src/index.ts
+@@ -177,12 +177,19 @@ export const SETUP_STATES = ["DISCOVERED", "WATCH", "SETUP_FORMING", "LIQUIDITY_
+ export type SetupState = (typeof SETUP_STATES)[number];
+ export const SETUP_MODES = ["CONSERVATIVE", "STANDARD", "AGGRESSIVE"] as const;
+ export type SetupMode = (typeof SETUP_MODES)[number];
+-export const SETUP_TYPES = ["SWEEP_MSS_FVG"] as const;
++export const SETUP_TYPES = ["SWEEP_MSS_FVG", "SILVER_BULLET"] as const;
+ export type SetupType = (typeof SETUP_TYPES)[number];
+ 
+ // --- Phase 8: entry, scoring and verdict enums ------------------------------------------------------------
+ 
+-export const ENTRY_MODELS = ["LTF_REFINEMENT", "M15_CLOSE"] as const;
++export const ENTRY_MODELS = [
++  "LTF_REFINEMENT",
++  "M15_CLOSE",
++  "IFVG",
++  "CONSERVATIVE_RETEST",
++  "NO_WICK_REBALANCE",
++  "BREAKER",
++] as const;
+ export type EntryModel = (typeof ENTRY_MODELS)[number];
+ export const CONFIRMATION_SIGNALS = ["REJECTION_CLOSE", "MICRO_SHIFT"] as const;
+ export type ConfirmationSignal = (typeof CONFIRMATION_SIGNALS)[number];
+diff --git a/packages/strategy-spec/README.md b/packages/strategy-spec/README.md
+index 4b8fb09..ba655f3 100644
+--- a/packages/strategy-spec/README.md
++++ b/packages/strategy-spec/README.md
+@@ -16,6 +16,7 @@ Language-neutral configuration shared by the API and the web app. Any change mus
+ | `no_wick.json` | marubozu/one-sided thresholds, body/ATR strength, candle-quality and context weights, not-evaluated components, relevance factors and labels, rebalance-zone rules |
+ | `sessions.json` | session and kill-zone windows (New York wall clock; the single window source), Asian range and ADR thresholds, session quality, Judas and PO3 rules, No Wick session context, not-evaluated (HOLIDAYS) |
+ | `setups.json` | SWEEP_MSS_FVG setup model: timeframes, AGGRESSIVE/STANDARD/CONSERVATIVE mode rules, step windows, approach distance, trading-day expiry, unreachable states |
++| `silver_bullet.json` | Separate research-only Silver Bullet model: DST-aware New York windows, M5 FVG/displacement gates, structural invalidation, liquidity target, R:R and fail-safe rules |
+ | `entry.json` | entry models (LTF_REFINEMENT M5 / M15_CLOSE), confirmation signals per mode, micro lookback, stop buffer, targets, R:R minimums, chase distance, ready window, not-evaluated entry features |
+ | `scoring.json` | score weights, grades, V1 component values, counter-trend penalty, correlated-evidence factor, data-quality scores, confidence rules and cap, minimum grade, unbuilt-gate blockers (news) |
+ | `alerts.json` | alert types (category, priority, cooldown), key pool kinds, priority raises, minimum displacement grade / No Wick relevance / FVG quality, No Wick zone states, feed caps, not-evaluated alert sources |
+diff --git a/packages/strategy-spec/enums.json b/packages/strategy-spec/enums.json
+index 05fd372..75f0335 100644
+--- a/packages/strategy-spec/enums.json
++++ b/packages/strategy-spec/enums.json
+@@ -381,7 +381,8 @@
+     "AGGRESSIVE"
+   ],
+   "SetupType": [
+-    "SWEEP_MSS_FVG"
++    "SWEEP_MSS_FVG",
++    "SILVER_BULLET"
+   ],
+   "EntryModel": [
+     "LTF_REFINEMENT",
+diff --git a/packages/strategy-spec/silver_bullet.json b/packages/strategy-spec/silver_bullet.json
+new file mode 100644
+index 0000000..3682a21
+--- /dev/null
++++ b/packages/strategy-spec/silver_bullet.json
+@@ -0,0 +1,19 @@
++{
++  "$comment": "Silver Bullet is a separate deterministic research setup family. Windows are America/New_York wall-clock times and therefore DST-aware. FVG formation and all dependencies are gated by knownAt; fills use later closed M5 candles only. Ambiguous or missing risk geometry is BLOCKED, never inferred. Defaults are untuned and require walk-forward validation before verdict authority.",
++  "timezone": "America/New_York",
++  "timeframe": "M5",
++  "defaultBars": 1000,
++  "windows": {
++    "LONDON": { "start": "03:00", "end": "04:00" },
++    "NEW_YORK_AM": { "start": "10:00", "end": "11:00" },
++    "NEW_YORK_PM": { "start": "14:00", "end": "15:00" }
++  },
++  "minFvgQuality": 50,
++  "minDisplacementGrade": "MODERATE",
++  "stopBufferAtr": 0.1,
++  "minRiskReward": 1.5,
++  "entryRule": "PROXIMAL_EDGE",
++  "stopRule": "LATEST_CAUSALLY_KNOWN_OPPOSING_SWING",
++  "targetRule": "NEAREST_CAUSALLY_KNOWN_UNTAKEN_LIQUIDITY",
++  "verdictAuthority": "RESEARCH_ONLY"
++}
+diff --git a/packages/strategy-spec/strategy_version.json b/packages/strategy-spec/strategy_version.json
+index 368183d..93bb996 100644
+--- a/packages/strategy-spec/strategy_version.json
++++ b/packages/strategy-spec/strategy_version.json
+@@ -1,8 +1,8 @@
+ {
+   "$comment": "Bumped by every phase. Any change to a spec file must bump strategyVersion.",
+-  "strategyVersion": "0.22.3-phase22-breaker",
+-  "phase": 22,
+-  "phaseName": "Entry-Model Coverage: IFVG + Conservative-Retest + No-Wick-Rebalance + Breaker entries (research/experimental; FVG default unchanged)",
++  "strategyVersion": "0.23.0-phase23-silver-bullet-research",
++  "phase": 23,
++  "phaseName": "Silver Bullet Research Model (separate DST-aware M5 setup family; no verdict authority)",
+   "verdictAuthority": "FAIL_SAFE_ONLY",
+   "enabledEngines": [
+     "data_quality",
+@@ -31,6 +31,7 @@
+     "analytics",
+     "backtest",
+     "replay",
+-    "pd_arrays"
++    "pd_arrays",
++    "silver_bullet"
+   ]
+ }
+diff --git a/services/api/app/api/routes.py b/services/api/app/api/routes.py
+index 232c217..2d9e43c 100644
+--- a/services/api/app/api/routes.py
++++ b/services/api/app/api/routes.py
+@@ -96,6 +96,7 @@ from app.services.risk.models import RiskAssessment, RiskOverview
+ from app.services.scanner.models import MarketsOverview, ScanCriteria, ScanResult
+ from app.services.sessions.models import SessionAnalysis
+ from app.services.setups.models import SetupAnalysis
++from app.services.silver_bullet.models import SilverBulletAnalysis
+ from app.services.structure.models import StructureAlignment, StructureAnalysis
+ 
+ router = APIRouter()
+@@ -308,6 +309,27 @@ async def setups(
+     return result
+ 
+ 
++@router.get(
++    "/api/v1/silver-bullet/{symbol}",
++    response_model=SilverBulletAnalysis,
++    response_model_by_alias=True,
++)
++async def silver_bullet(
++    symbol: str,
++    request: Request,
++    bars: int = 1000,
++    end: datetime | None = None,
++) -> SilverBulletAnalysis:
++    """Research-only Silver Bullet candidates; never an order or authoritative verdict."""
++    if get_instrument(symbol) is None:
++        raise HTTPException(status_code=404, detail=f"unknown symbol {symbol}")
++    try:
++        result: SilverBulletAnalysis = await _state(request).silver_bullet.analyze(symbol, bars, end)
++    except ChartRequestError as exc:
++        raise HTTPException(status_code=422, detail=str(exc)) from exc
++    return result
++
++
+ @router.get("/api/v1/risk/{symbol}", response_model=RiskOverview, response_model_by_alias=True)
+ async def risk_overview(symbol: str, request: Request) -> RiskOverview:
+     if get_instrument(symbol) is None:
+diff --git a/services/api/app/domain/enums.py b/services/api/app/domain/enums.py
+index 2b20f18..de83274 100644
+--- a/services/api/app/domain/enums.py
++++ b/services/api/app/domain/enums.py
+@@ -510,6 +510,7 @@ class SetupMode(StrEnum):
+ 
+ class SetupType(StrEnum):
+     SWEEP_MSS_FVG = "SWEEP_MSS_FVG"
++    SILVER_BULLET = "SILVER_BULLET"
+ 
+ 
+ # --- Phase 8: entry, scoring and verdict -----------------------------------------------------------------
+@@ -520,7 +521,9 @@ class EntryModel(StrEnum):
+     M15_CLOSE = "M15_CLOSE"
+     IFVG = "IFVG"  # research/experimental (Phase 22): entry zone is a CONFIRMED IFVG, not the FVG
+     CONSERVATIVE_RETEST = "CONSERVATIVE_RETEST"  # research (Phase 22): FVG zone + retest (REJECTION_CLOSE)
+-    NO_WICK_REBALANCE = "NO_WICK_REBALANCE"  # research (Phase 22): No-Wick rebalance-zone body edge + LTF conf
++    NO_WICK_REBALANCE = (
++        "NO_WICK_REBALANCE"  # research (Phase 22): No-Wick rebalance-zone body edge + LTF conf
++    )
+     BREAKER = "BREAKER"  # research (Phase 22): CONFIRMED breaker zone edge + shared LTF confirmation
+ 
+ 
+diff --git a/services/api/app/main.py b/services/api/app/main.py
+index d798c85..e6c8589 100644
+--- a/services/api/app/main.py
++++ b/services/api/app/main.py
+@@ -40,6 +40,7 @@ from app.services.risk.service import RiskService
+ from app.services.scanner.service import ScannerService
+ from app.services.sessions.service import SessionService
+ from app.services.setups.service import SetupService
++from app.services.silver_bullet.service import SilverBulletService
+ from app.services.structure.service import StructureService
+ 
+ logger = logging.getLogger("fmcc")
+@@ -57,6 +58,7 @@ class AppState:
+     pd_arrays: PdArraysService
+     sessions: SessionService
+     setups: SetupService
++    silver_bullet: SilverBulletService
+     risk: RiskService
+     calendar: CalendarService
+     macro: MacroService
+@@ -85,6 +87,7 @@ class Engines:
+     risk: RiskService
+     macro: MacroService
+     setups: SetupService
++    silver_bullet: SilverBulletService
+ 
+ 
+ def build_engines(
+@@ -101,7 +104,20 @@ def build_engines(
+     fred_key = settings.fred_api_key.get_secret_value() if settings.fred_api_key else ""
+     macro = MacroService(candles, calendar, fred_key)
+     setups = SetupService(candles, structure, fvg, risk=risk, macro=macro)
+-    return Engines(candles, structure, liquidity, fvg, no_wick, sessions, calendar, risk, macro, setups)
++    silver_bullet = SilverBulletService(candles, fvg)
++    return Engines(
++        candles,
++        structure,
++        liquidity,
++        fvg,
++        no_wick,
++        sessions,
++        calendar,
++        risk,
++        macro,
++        setups,
++        silver_bullet,
++    )
+ 
+ 
+ def _rephraser(settings: Settings) -> ClaudeRephraser | None:
+@@ -127,7 +143,7 @@ def create_app(
+     engines = build_engines(settings, provider, clock)
+     candles, structure, liquidity, fvg = engines.candles, engines.structure, engines.liquidity, engines.fvg
+     no_wick, sessions, calendar, risk = engines.no_wick, engines.sessions, engines.calendar, engines.risk
+-    macro, setups = engines.macro, engines.setups
++    macro, setups, silver_bullet = engines.macro, engines.setups, engines.silver_bullet
+     market_state = MarketStateService(
+         candles, structure, liquidity, fvg, no_wick, sessions, setups, calendar=calendar, macro=macro
+     )
+@@ -149,6 +165,7 @@ def create_app(
+         pd_arrays=pd_arrays,
+         sessions=sessions,
+         setups=setups,
++        silver_bullet=silver_bullet,
+         risk=risk,
+         calendar=calendar,
+         macro=macro,
+diff --git a/services/api/app/services/backtest/funnel.py b/services/api/app/services/backtest/funnel.py
+index 398ec0f..e0809dc 100644
+--- a/services/api/app/services/backtest/funnel.py
++++ b/services/api/app/services/backtest/funnel.py
+@@ -9,13 +9,14 @@ The FULL LIVE-DECISION FUNNEL (risk veto, news veto) is layered on top by the ru
+ to assess a captured plan at its confirmation time. That distinction is preserved deliberately: the technical
+ funnel is "did a valid ICT setup form?"; the live funnel is "would the live system have been allowed to act?".
+ """
++
+ from __future__ import annotations
+ 
+ from collections import Counter
+ from dataclasses import dataclass, field
+ 
++from app.domain.enums import Direction, SetupState
+ from app.services.setups.models import PROGRESS, Setup
+-from app.domain.enums import SetupState
+ 
+ # PROGRESS milestone indices (see setups/models.PROGRESS)
+ I_LIQUIDITY = PROGRESS.index(SetupState.LIQUIDITY_EVENT)  # 3: a setup initiated
+@@ -88,7 +89,7 @@ class TechnicalFunnel:
+     reached_retracement: int = 0  # price traded into the entry FVG (ENTRY_ZONE_TOUCHED)
+     reached_confirmation: int = 0  # an LTF confirmation formed (confirmation is not None)
+     technically_eligible: int = 0  # confirmation AND a constructable entry plan existed
+-    reasons: Counter = field(default_factory=Counter)  # terminal-reason histogram
++    reasons: Counter[str] = field(default_factory=Counter)  # terminal-reason histogram
+ 
+     def observe(self, s: Setup) -> None:
+         self.started += 1
+@@ -114,7 +115,7 @@ class BiasFunnel:
+     disagreement: int = 0  # both established but D1 != H4
+     aligned: int = 0  # D1 == H4 (the only state in which a setup can initiate)
+ 
+-    def observe(self, d1, h4) -> None:
++    def observe(self, d1: Direction | None, h4: Direction | None) -> None:
+         self.steps += 1
+         if d1 is None or h4 is None:
+             self.bias_unavailable += 1
+diff --git a/services/api/app/services/setups/engine.py b/services/api/app/services/setups/engine.py
+index 58a309a..772cde1 100644
+--- a/services/api/app/services/setups/engine.py
++++ b/services/api/app/services/setups/engine.py
+@@ -202,9 +202,9 @@ class SetupMachine:
+         self.entry_array = self.entry_cfg.entry_zones.get(inputs.entry_model, PdArrayType.FVG)
+         # A per-model confirmation override (research models) takes precedence over the mode's confirmation;
+         # production models have no override, so their confirmation is unchanged.
+-        self.confirm_rules = self.entry_cfg.confirmation_overrides.get(
+-            inputs.entry_model
+-        ) or self.entry_cfg.confirmation[mode]
++        self.confirm_rules = (
++            self.entry_cfg.confirmation_overrides.get(inputs.entry_model) or self.entry_cfg.confirmation[mode]
++        )
+         signals = " or ".join(sorted(x.value for x in self.confirm_rules.signals))
+         self.confirmation_text = f"{self.entry_tf.value} {signals} confirmation" + (
+             " + second candle" if self.confirm_rules.second_candle else ""
+diff --git a/services/api/app/services/setups/service.py b/services/api/app/services/setups/service.py
+index 4553778..a9e95c7 100644
+--- a/services/api/app/services/setups/service.py
++++ b/services/api/app/services/setups/service.py
+@@ -25,6 +25,7 @@ from app.domain.enums import (
+     PdArrayType,
+     PdEventType,
+     SetupMode,
++    Timeframe,
+ )
+ from app.domain.models import get_instrument
+ from app.services.calendar.models import NewsAssessment
+@@ -37,10 +38,11 @@ from app.services.fvg.service import FvgService
+ from app.services.liquidity.models import LiquidityEvent, LiquidityPool
+ from app.services.macro.models import MacroAssessment
+ from app.services.macro.service import MacroService
+-from app.services.pd_arrays.service import PdArraysService
+ from app.services.market_state.verdict import data_gate, decide_verdict, focus_setup
+ from app.services.no_wick.engine import analyze as no_wick_analyze
+ from app.services.no_wick.models import NoWickConfig, NoWickEvent, NoWickZoneEvent
++from app.services.pd_arrays.models import PdEvent, PdZone
++from app.services.pd_arrays.service import PdArraysService
+ from app.services.risk.engine import TradePlan
+ from app.services.risk.models import RiskAssessment
+ from app.services.risk.service import RiskService
+@@ -82,7 +84,7 @@ class SetupRun:
+     no_wick_zone_events: list[NoWickZoneEvent]
+ 
+ 
+-def _no_wick_zone_arrays(events, symbol, timeframe) -> list[PdArray]:
++def _no_wick_zone_arrays(events: list[NoWickEvent], symbol: str, timeframe: Timeframe) -> list[PdArray]:
+     """Convert significant No-Wick rebalance zones into entry-zone candidates (research, Phase 22).
+ 
+     A zone exists only for a significant No-Wick candle (the engine's V1 significance rule), so its presence
+@@ -127,11 +129,12 @@ def _no_wick_zone_arrays(events, symbol, timeframe) -> list[PdArray]:
+     return out
+ 
+ 
+-def _breaker_arrays(zones, events) -> tuple[list[PdArray], dict[str, datetime]]:
++def _breaker_arrays(zones: list[PdZone], events: list[PdEvent]) -> tuple[list[PdArray], dict[str, datetime]]:
+     """Convert CONFIRMED breaker zones (PD Array engine) into entry candidates + their confirmation times.
+ 
+-    A breaker qualifies only when its status is CONFIRMED_BREAKER and the PD Array engine emitted the canonical
+-    BREAKER_CONFIRMED event; that event's time is the availability gate (never the POTENTIAL creation time), so
++    A breaker qualifies only when its status is CONFIRMED_BREAKER and the PD Array engine emitted
++    the canonical BREAKER_CONFIRMED event. That event's time is the availability gate (never the
++    POTENTIAL creation time), so
+     there is no lookahead. Entry edges are the canonical zone high/low. The midpoint/key_level is carried for
+     diagnostics only and is not used by the arming/plan logic (which uses the edge)."""
+     confirmed = {e.pd_array_id: e.known_at for e in events if e.type is PdEventType.BREAKER_CONFIRMED}
+@@ -205,7 +208,8 @@ class SetupService:
+         self._fvg = fvg
+         self._risk = risk or RiskService(candles)
+         self._macro = macro or MacroService(candles, self._risk.calendar)
+-        # Advanced PD arrays are only consulted for the research BREAKER entry model (lazy: built on first use).
++        # Advanced PD arrays are only consulted for the research BREAKER entry model
++        # (lazy: built on first use).
+         self._pd_arrays = pd_arrays
+         self.cfg = cfg or SetupConfig.from_spec()
+         self.entry_cfg = entry_cfg or entry_config()
+@@ -271,16 +275,17 @@ class SetupService:
+             gap_after=gap_after,
+         )
+         ifvg_confirmed_at = {
+-            e.pd_array_id: e.known_at
+-            for e in fvg.events
+-            if e.type is FvgEventType.IFVG_CONFIRMED
++            e.pd_array_id: e.known_at for e in fvg.events if e.type is FvgEventType.IFVG_CONFIRMED
+         }
+         # Research entry-zone arrays (Phase 22): only the matching research model consumes extra zones, so
+         # production/FVG/IFVG/Conservative-Retest paths receive the exact same pd_arrays as before.
+         entry_pd_arrays = fvg.pd_arrays
+         breaker_confirmed_at: dict[str, datetime] = {}
+         if model is EntryModel.NO_WICK_REBALANCE:
+-            entry_pd_arrays = [*fvg.pd_arrays, *_no_wick_zone_arrays(no_wick_events, series.symbol, self.cfg.timeframe)]
++            entry_pd_arrays = [
++                *fvg.pd_arrays,
++                *_no_wick_zone_arrays(no_wick_events, series.symbol, self.cfg.timeframe),
++            ]
+         elif model is EntryModel.BREAKER:
+             pda = await self._pd_array_service().analyze(series.symbol, self.cfg.timeframe, size, end)
+             breaker_arrays, breaker_confirmed_at = _breaker_arrays(pda.zones, pda.events)
+diff --git a/services/api/app/services/silver_bullet/__init__.py b/services/api/app/services/silver_bullet/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/services/api/app/services/silver_bullet/engine.py b/services/api/app/services/silver_bullet/engine.py
+new file mode 100644
+index 0000000..98a1a04
+--- /dev/null
++++ b/services/api/app/services/silver_bullet/engine.py
+@@ -0,0 +1,348 @@
++"""Pure Silver Bullet detector (closed M5 candles, New York wall-clock windows, no lookahead)."""
++
++from __future__ import annotations
++
++from collections.abc import Sequence
++from dataclasses import dataclass, field
++from datetime import datetime
++
++from app.domain.enums import (
++    Direction,
++    DisplacementGrade,
++    LiquiditySide,
++    PdArrayType,
++    SwingKind,
++)
++from app.domain.models import Candle
++from app.services.displacement.engine import DisplacementEvent
++from app.services.fvg.engine import PdArray
++from app.services.liquidity.models import LiquidityPool
++from app.services.silver_bullet.models import (
++    SilverBulletConfig,
++    SilverBulletSetup,
++    SilverBulletState,
++    SilverBulletWindowSpec,
++)
++from app.services.structure.models import Swing
++
++GRADE_RANK = {grade: index for index, grade in enumerate(DisplacementGrade)}
++
++
++@dataclass(frozen=True)
++class SilverBulletInputs:
++    candles: Sequence[Candle]
++    pd_arrays: Sequence[PdArray]
++    displacements: Sequence[DisplacementEvent]
++    swings: Sequence[Swing]
++    pools: Sequence[LiquidityPool]
++    gap_after: set[datetime] = field(default_factory=set)
++    price_precision: int = 2
++
++
++def _window_for(
++    known_at: datetime, cfg: SilverBulletConfig
++) -> tuple[SilverBulletWindowSpec, datetime, datetime] | None:
++    local_day = known_at.astimezone(cfg.timezone).date()
++    for window in cfg.windows:
++        start, end = window.bounds(local_day, cfg.timezone)
++        if start <= known_at < end:
++            return window, start, end
++    return None
++
++
++def _displacement(
++    array: PdArray, inputs: SilverBulletInputs, cfg: SilverBulletConfig
++) -> DisplacementEvent | None:
++    matches = [
++        event
++        for event in inputs.displacements
++        if event.id == array.displacement_event_id
++        and event.direction is array.direction
++        and event.known_at <= array.known_at
++        and event.created_fvg
++        and not event.across_gap
++        and GRADE_RANK[event.grade] >= GRADE_RANK[cfg.min_displacement_grade]
++    ]
++    return max(matches, key=lambda event: (event.known_at, event.id)) if matches else None
++
++
++def _structural_swing(array: PdArray, inputs: SilverBulletInputs) -> Swing | None:
++    bullish = array.direction is Direction.BULLISH
++    entry = array.high if bullish else array.low
++    kind = SwingKind.LOW if bullish else SwingKind.HIGH
++    matches = [
++        swing
++        for swing in inputs.swings
++        if swing.kind is kind
++        and swing.known_at <= array.known_at
++        and not swing.across_gap
++        and (swing.price < entry if bullish else swing.price > entry)
++    ]
++    return max(matches, key=lambda swing: (swing.known_at, swing.time, swing.id)) if matches else None
++
++
++def _target(array: PdArray, entry: float, inputs: SilverBulletInputs) -> LiquidityPool | None:
++    bullish = array.direction is Direction.BULLISH
++    side = LiquiditySide.BSL if bullish else LiquiditySide.SSL
++    matches = [
++        pool
++        for pool in inputs.pools
++        if pool.side is side
++        and pool.known_at <= array.known_at
++        and (pool.taken_at is None or pool.taken_at > array.known_at)
++        and not pool.data_gap
++        and (pool.price > entry if bullish else pool.price < entry)
++    ]
++    return min(matches, key=lambda pool: (abs(pool.price - entry), pool.id)) if matches else None
++
++
++def _blocked(
++    array: PdArray,
++    window: SilverBulletWindowSpec,
++    start: datetime,
++    end: datetime,
++    reason: str,
++    *,
++    displacement: DisplacementEvent | None = None,
++    swing: Swing | None = None,
++    target: LiquidityPool | None = None,
++    entry: float | None = None,
++    stop: float | None = None,
++    target_price: float | None = None,
++    risk_reward: float | None = None,
++) -> SilverBulletSetup:
++    return SilverBulletSetup(
++        id=f"SB-{window.name.value}-{array.id}",
++        window=window.name,
++        direction=array.direction,
++        state=SilverBulletState.BLOCKED,
++        formed_at=array.known_at,
++        window_start=start,
++        window_end=end,
++        fvg_id=array.id,
++        displacement_id=displacement.id if displacement else None,
++        structural_swing_id=swing.id if swing else None,
++        target_pool_id=target.id if target else None,
++        entry=entry,
++        stop=stop,
++        target=target_price,
++        risk_reward=risk_reward,
++        filled_at=None,
++        blockers=[reason],
++        next_required_event="none (candidate blocked)",
++    )
++
++
++def _candidate(
++    array: PdArray,
++    window: SilverBulletWindowSpec,
++    start: datetime,
++    end: datetime,
++    inputs: SilverBulletInputs,
++    cfg: SilverBulletConfig,
++    closed: Sequence[Candle],
++) -> SilverBulletSetup:
++    displacement = _displacement(array, inputs, cfg)
++    if displacement is None:
++        return _blocked(array, window, start, end, "NO_CAUSAL_DISPLACEMENT")
++
++    swing = _structural_swing(array, inputs)
++    if swing is None:
++        return _blocked(array, window, start, end, "NO_STRUCTURAL_INVALIDATION", displacement=displacement)
++
++    bullish = array.direction is Direction.BULLISH
++    entry = array.high if bullish else array.low
++    buffer = displacement.atr * cfg.stop_buffer_atr
++    stop = swing.price - buffer if bullish else swing.price + buffer
++    stop = round(stop, inputs.price_precision)
++    if (bullish and stop >= entry) or (not bullish and stop <= entry):
++        return _blocked(
++            array,
++            window,
++            start,
++            end,
++            "INVALID_STOP_GEOMETRY",
++            displacement=displacement,
++            swing=swing,
++            entry=entry,
++            stop=stop,
++        )
++
++    target = _target(array, entry, inputs)
++    if target is None:
++        return _blocked(
++            array,
++            window,
++            start,
++            end,
++            "NO_LIQUIDITY_TARGET",
++            displacement=displacement,
++            swing=swing,
++            entry=entry,
++            stop=stop,
++        )
++
++    risk = abs(entry - stop)
++    reward = abs(target.price - entry)
++    risk_reward = round(reward / risk, 2)
++    if risk_reward < cfg.min_risk_reward:
++        return _blocked(
++            array,
++            window,
++            start,
++            end,
++            "RISK_REWARD_BELOW_MINIMUM",
++            displacement=displacement,
++            swing=swing,
++            target=target,
++            entry=entry,
++            stop=stop,
++            target_price=target.price,
++            risk_reward=risk_reward,
++        )
++
++    eligible = [
++        candle for candle in closed if candle.open_time >= array.known_at and candle.close_time <= end
++    ]
++    touches = [
++        candle for candle in eligible if (candle.low <= array.high if bullish else candle.high >= array.low)
++    ]
++    touch = touches[0] if touches else None
++    target_hits = [
++        candle
++        for candle in eligible
++        if (candle.high >= target.price if bullish else candle.low <= target.price)
++    ]
++    target_hit = target_hits[0] if target_hits else None
++    as_of = closed[-1].close_time if closed else None
++    relevant_end = min(end, as_of) if as_of is not None else array.known_at
++    if any(array.known_at <= gap < relevant_end for gap in inputs.gap_after):
++        return _blocked(
++            array,
++            window,
++            start,
++            end,
++            "DATA_GAP_BEFORE_ENTRY",
++            displacement=displacement,
++            swing=swing,
++            target=target,
++            entry=entry,
++            stop=stop,
++            target_price=target.price,
++            risk_reward=risk_reward,
++        )
++    if touch is not None:
++        if target_hit is not None and target_hit.open_time == touch.open_time:
++            return _blocked(
++                array,
++                window,
++                start,
++                end,
++                "INTRABAR_ENTRY_TARGET_AMBIGUITY",
++                displacement=displacement,
++                swing=swing,
++                target=target,
++                entry=entry,
++                stop=stop,
++                target_price=target.price,
++                risk_reward=risk_reward,
++            )
++        stop_touched = touch.low <= stop if bullish else touch.high >= stop
++        if stop_touched:
++            return _blocked(
++                array,
++                window,
++                start,
++                end,
++                "INTRABAR_ENTRY_STOP_AMBIGUITY",
++                displacement=displacement,
++                swing=swing,
++                target=target,
++                entry=entry,
++                stop=stop,
++                target_price=target.price,
++                risk_reward=risk_reward,
++            )
++
++    if target_hit is not None and (touch is None or target_hit.open_time < touch.open_time):
++        return SilverBulletSetup(
++            id=f"SB-{window.name.value}-{array.id}",
++            window=window.name,
++            direction=array.direction,
++            state=SilverBulletState.ENTRY_MISSED,
++            formed_at=array.known_at,
++            window_start=start,
++            window_end=end,
++            fvg_id=array.id,
++            displacement_id=displacement.id,
++            structural_swing_id=swing.id,
++            target_pool_id=target.id,
++            entry=entry,
++            stop=stop,
++            target=target.price,
++            risk_reward=risk_reward,
++            filled_at=None,
++            blockers=[],
++            next_required_event="none (target liquidity reached before retracement)",
++        )
++
++    state = (
++        SilverBulletState.FILLED
++        if touch is not None
++        else SilverBulletState.EXPIRED
++        if as_of is not None and as_of >= end
++        else SilverBulletState.ARMED
++    )
++    next_event = (
++        "manage the research outcome against structural stop and liquidity target"
++        if state is SilverBulletState.FILLED
++        else "none (window ended without retracement)"
++        if state is SilverBulletState.EXPIRED
++        else f"retracement to the FVG proximal edge before {end.isoformat()}"
++    )
++    return SilverBulletSetup(
++        id=f"SB-{window.name.value}-{array.id}",
++        window=window.name,
++        direction=array.direction,
++        state=state,
++        formed_at=array.known_at,
++        window_start=start,
++        window_end=end,
++        fvg_id=array.id,
++        displacement_id=displacement.id,
++        structural_swing_id=swing.id,
++        target_pool_id=target.id,
++        entry=entry,
++        stop=stop,
++        target=target.price,
++        risk_reward=risk_reward,
++        filled_at=touch.close_time if touch else None,
++        blockers=[],
++        next_required_event=next_event,
++    )
++
++
++def run_silver_bullet(
++    inputs: SilverBulletInputs, cfg: SilverBulletConfig | None = None
++) -> list[SilverBulletSetup]:
++    """Return one explainable candidate per qualifying in-window FVG."""
++    cfg = cfg or SilverBulletConfig.from_spec()
++    closed = sorted(
++        (candle for candle in inputs.candles if candle.is_closed and candle.timeframe is cfg.timeframe),
++        key=lambda candle: candle.open_time,
++    )
++    arrays = sorted(inputs.pd_arrays, key=lambda array: (array.known_at, array.id))
++    setups: list[SilverBulletSetup] = []
++    for array in arrays:
++        if (
++            array.type is not PdArrayType.FVG
++            or array.timeframe is not cfg.timeframe
++            or array.quality_score < cfg.min_fvg_quality
++        ):
++            continue
++        match = _window_for(array.known_at, cfg)
++        if match is None:
++            continue
++        window, start, end = match
++        setups.append(_candidate(array, window, start, end, inputs, cfg, closed))
++    return setups
+diff --git a/services/api/app/services/silver_bullet/models.py b/services/api/app/services/silver_bullet/models.py
+new file mode 100644
+index 0000000..60b3465
+--- /dev/null
++++ b/services/api/app/services/silver_bullet/models.py
+@@ -0,0 +1,137 @@
++"""Configuration and wire models for the independent Silver Bullet setup family."""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++from datetime import UTC, date, datetime, time
++from enum import StrEnum
++from zoneinfo import ZoneInfo
++
++from app.contracts import load_spec
++from app.domain.base import ApiModel
++from app.domain.enums import AnalysisIneligibility, DataQuality, Direction, DisplacementGrade, Timeframe
++
++
++def _hm(value: str) -> time:
++    hours, minutes = value.split(":")
++    return time(int(hours), int(minutes))
++
++
++class SilverBulletWindow(StrEnum):
++    LONDON = "LONDON"
++    NEW_YORK_AM = "NEW_YORK_AM"
++    NEW_YORK_PM = "NEW_YORK_PM"
++
++
++class SilverBulletState(StrEnum):
++    ARMED = "ARMED"
++    FILLED = "FILLED"
++    ENTRY_MISSED = "ENTRY_MISSED"
++    EXPIRED = "EXPIRED"
++    BLOCKED = "BLOCKED"
++
++
++@dataclass(frozen=True)
++class SilverBulletWindowSpec:
++    name: SilverBulletWindow
++    start: time
++    end: time
++
++    def bounds(self, day: date, timezone: ZoneInfo) -> tuple[datetime, datetime]:
++        """Return UTC bounds for a New York calendar day, honoring DST."""
++        start = datetime.combine(day, self.start, tzinfo=timezone).astimezone(UTC)
++        end = datetime.combine(day, self.end, tzinfo=timezone).astimezone(UTC)
++        return start, end
++
++
++@dataclass(frozen=True)
++class SilverBulletConfig:
++    timezone: ZoneInfo
++    timeframe: Timeframe
++    default_bars: int
++    windows: tuple[SilverBulletWindowSpec, ...]
++    min_fvg_quality: float
++    min_displacement_grade: DisplacementGrade
++    stop_buffer_atr: float
++    min_risk_reward: float
++    entry_rule: str
++    stop_rule: str
++    target_rule: str
++    verdict_authority: str
++
++    @classmethod
++    def from_spec(cls) -> SilverBulletConfig:
++        spec = load_spec("silver_bullet")
++        windows = tuple(
++            SilverBulletWindowSpec(SilverBulletWindow(name), _hm(value["start"]), _hm(value["end"]))
++            for name, value in spec["windows"].items()
++        )
++        if {window.name for window in windows} != set(SilverBulletWindow):
++            raise ValueError("silver_bullet.json must define all three Silver Bullet windows")
++        if any(window.end <= window.start for window in windows):
++            raise ValueError("Silver Bullet windows must start and end on the same New York date")
++        timeframe = Timeframe(spec["timeframe"])
++        step = int(timeframe.duration.total_seconds() // 60)
++        if any(value.minute % step for window in windows for value in (window.start, window.end)):
++            raise ValueError("Silver Bullet windows must align with the configured timeframe")
++        if not 0 <= float(spec["minFvgQuality"]) <= 100:
++            raise ValueError("minFvgQuality must be in 0..100")
++        if int(spec["defaultBars"]) < 1:
++            raise ValueError("defaultBars must be positive")
++        if float(spec["stopBufferAtr"]) < 0 or float(spec["minRiskReward"]) <= 0:
++            raise ValueError("risk parameters must be positive")
++        if spec["entryRule"] != "PROXIMAL_EDGE":
++            raise ValueError("only PROXIMAL_EDGE entry is supported")
++        return cls(
++            timezone=ZoneInfo(spec["timezone"]),
++            timeframe=timeframe,
++            default_bars=int(spec["defaultBars"]),
++            windows=windows,
++            min_fvg_quality=float(spec["minFvgQuality"]),
++            min_displacement_grade=DisplacementGrade(spec["minDisplacementGrade"]),
++            stop_buffer_atr=float(spec["stopBufferAtr"]),
++            min_risk_reward=float(spec["minRiskReward"]),
++            entry_rule=str(spec["entryRule"]),
++            stop_rule=str(spec["stopRule"]),
++            target_rule=str(spec["targetRule"]),
++            verdict_authority=str(spec["verdictAuthority"]),
++        )
++
++
++class SilverBulletSetup(ApiModel):
++    id: str
++    setup_type: str = "SILVER_BULLET"
++    window: SilverBulletWindow
++    direction: Direction
++    state: SilverBulletState
++    formed_at: datetime
++    window_start: datetime
++    window_end: datetime
++    fvg_id: str
++    displacement_id: str | None
++    structural_swing_id: str | None
++    target_pool_id: str | None
++    entry: float | None
++    stop: float | None
++    target: float | None
++    risk_reward: float | None
++    filled_at: datetime | None
++    blockers: list[str]
++    next_required_event: str
++
++
++class SilverBulletAnalysis(ApiModel):
++    symbol: str
++    setup_type: str = "SILVER_BULLET"
++    timeframe: Timeframe
++    as_of: datetime | None
++    candle_count: int
++    quality: DataQuality
++    eligible_for_decision: bool
++    ineligibility: list[AnalysisIneligibility]
++    setups: list[SilverBulletSetup]
++    verdict_authority: str
++    requested_end: datetime | None
++    provider_error: str | None
++    strategy_version: str
++    generated_at: datetime
+diff --git a/services/api/app/services/silver_bullet/service.py b/services/api/app/services/silver_bullet/service.py
+new file mode 100644
+index 0000000..f7d6c4a
+--- /dev/null
++++ b/services/api/app/services/silver_bullet/service.py
+@@ -0,0 +1,65 @@
++"""Silver Bullet application service on the shared validated candle/FVG/liquidity engines."""
++
++from __future__ import annotations
++
++from datetime import datetime
++
++from app.contracts import strategy_version
++from app.domain.models import get_instrument
++from app.services.candles.service import CandleService, ChartRequestError
++from app.services.fvg.service import FvgService
++from app.services.silver_bullet.engine import SilverBulletInputs, run_silver_bullet
++from app.services.silver_bullet.models import SilverBulletAnalysis, SilverBulletConfig
++
++
++class SilverBulletService:
++    def __init__(
++        self,
++        candles: CandleService,
++        fvg: FvgService,
++        cfg: SilverBulletConfig | None = None,
++    ) -> None:
++        self._candles = candles
++        self._fvg = fvg
++        self.cfg = cfg or SilverBulletConfig.from_spec()
++
++    async def analyze(
++        self,
++        symbol: str,
++        bars: int | None = None,
++        end: datetime | None = None,
++    ) -> SilverBulletAnalysis:
++        size = self.cfg.default_bars if bars is None else bars
++        series = await self._candles.load_series(symbol, self.cfg.timeframe, size, end)
++        fvg, structure, liquidity = await self._fvg.run_series(series, end)
++        instrument = get_instrument(series.symbol)
++        if instrument is None:
++            raise ChartRequestError(f"unknown symbol {symbol}")
++        closed = [candle for candle in series.candles if candle.is_closed]
++        setups = run_silver_bullet(
++            SilverBulletInputs(
++                candles=closed,
++                pd_arrays=fvg.pd_arrays,
++                displacements=fvg.displacements,
++                swings=structure.swings,
++                pools=liquidity.pools,
++                gap_after={gap.end for gap in self._candles.gaps(series)},
++                price_precision=instrument.price_precision,
++            ),
++            self.cfg,
++        )
++        return SilverBulletAnalysis(
++            symbol=series.symbol,
++            timeframe=self.cfg.timeframe,
++            as_of=closed[-1].close_time if closed else None,
++            candle_count=len(closed),
++            quality=series.quality,
++            eligible_for_decision=not structure.ineligibility,
++            ineligibility=list(structure.ineligibility),
++            setups=setups,
++            verdict_authority=self.cfg.verdict_authority,
++            requested_end=end,
++            provider_error=series.provider_error,
++            strategy_version=strategy_version(),
++            generated_at=series.now,
++        )
+diff --git a/services/api/scripts/diag_funnel.py b/services/api/scripts/diag_funnel.py
+index 99e752b..c63715b 100644
+--- a/services/api/scripts/diag_funnel.py
++++ b/services/api/scripts/diag_funnel.py
+@@ -9,11 +9,13 @@ Validated: reproduces the Phase 18 smoke confirmation at 2026-01-29 20:30 (AGGRE
+ 
+ Usage: python scripts/diag_funnel.py START END STRIDE MODEL  (dates ISO, STRIDE bars, MODEL M15_CLOSE|LTF)
+ """
++
+ from __future__ import annotations
+ 
+ import asyncio
+ import json
+ import sys
++from collections import Counter
+ from dataclasses import replace
+ from datetime import UTC, datetime, timedelta
+ 
+@@ -34,13 +36,12 @@ from app.providers.registry import default_registry
+ from app.services.analytics.engine import analyze as analytics_analyze
+ from app.services.analytics.engine import from_paper
+ from app.services.analytics.models import analytics_config
+-from app.services.backtest.funnel import BiasFunnel, TechnicalFunnel, terminal_reason
++from app.services.backtest.funnel import BiasFunnel, TechnicalFunnel
+ from app.services.backtest.models import backtest_config
+ from app.services.journal.models import journal_config
+ from app.services.paper.engine import simulate
+ from app.services.paper.models import Costs, paper_config
+ from app.services.paper.shared import candles_since, plan_ticket, ticket_view
+-from collections import Counter
+ 
+ 
+ class Clock:
+@@ -117,9 +118,15 @@ async def run_variant(engines, mode, model, start, end, stride, bias: BiasFunnel
+                 if s.do_not_chase:
+                     live["chase_skipped"] += 1
+                     continue
+-                t = plan_ticket("XAUUSD", s, run.analysis, paper_config().strategy,
+-                                Costs(source=CostSource.NONE, spread=0, slippage=0, commission=0),
+-                                0.5, s.confirmation.confirmed_at)
++                t = plan_ticket(
++                    "XAUUSD",
++                    s,
++                    run.analysis,
++                    paper_config().strategy,
++                    Costs(source=CostSource.NONE, spread=0, slippage=0, commission=0),
++                    0.5,
++                    s.confirmation.confirmed_at,
++                )
+                 if t is None:
+                     live["invalid_plan"] += 1
+                     continue
+@@ -143,14 +150,17 @@ async def run_variant(engines, mode, model, start, end, stride, bias: BiasFunnel
+     views = []
+     exc = []
+     for t, s in tickets:
+-        sc, gaps = await candles_since(engines.candles, "XAUUSD", bcfg.simulation_timeframe, t.created_at, sim_end)
++        sc, gaps = await candles_since(
++            engines.candles, "XAUUSD", bcfg.simulation_timeframe, t.created_at, sim_end
++        )
+         sim = simulate(t, [], sc, gaps, sim_end, jcfg)
+         v = ticket_view(t, sim, bcfg.starting_balance)
+         views.append(v)
+         if s.entry_plan is not None:
+-            exit_at = max((f.at for f in sim.fills), default=None) or sim.close_requested_at or sim.last_candle_at
+-            mfe, mae = excursions(s.direction, s.entry_plan.entry, sim.stop, sc,
+-                                  t.created_at, exit_at)
++            exit_at = (
++                max((f.at for f in sim.fills), default=None) or sim.close_requested_at or sim.last_candle_at
++            )
++            mfe, mae = excursions(s.direction, s.entry_plan.entry, sim.stop, sc, t.created_at, exit_at)
+             exc.append((mfe, mae, v))
+     collected = from_paper(views, PaperSource.STRATEGY, acfg)
+     stats = analytics_analyze(AnalyticsDataset.BACKTEST, collected, acfg, jcfg, paper=True)
+@@ -194,16 +204,25 @@ async def run_variant(engines, mode, model, start, end, stride, bias: BiasFunnel
+             "avg_duration_min": stats.average_duration_minutes,
+         },
+         "dispositions": [
+-            {"status": v.status.value, "result": v.result.value if v.result else None,
+-             "exit_reason": v.exit_reason.value if v.exit_reason else None,
+-             "created_at": v.created_at.isoformat(),
+-             "last_candle_at": v.last_candle_at.isoformat() if v.last_candle_at else None,
+-             "r": v.r_multiple, "data_gap": v.data_gap}
++            {
++                "status": v.status.value,
++                "result": v.result.value if v.result else None,
++                "exit_reason": v.exit_reason.value if v.exit_reason else None,
++                "created_at": v.created_at.isoformat(),
++                "last_candle_at": v.last_candle_at.isoformat() if v.last_candle_at else None,
++                "r": v.r_multiple,
++                "data_gap": v.data_gap,
++            }
+             for v in views
+         ],
+         "mfe_mae": [
+-            {"mfe_r": m, "mae_r": a, "r": v.r_multiple, "result": v.result.value if v.result else None,
+-             "created_at": v.created_at.isoformat()}
++            {
++                "mfe_r": m,
++                "mae_r": a,
++                "r": v.r_multiple,
++                "result": v.result.value if v.result else None,
++                "created_at": v.created_at.isoformat(),
++            }
+             for (m, a, v) in exc
+         ],
+     }
+@@ -221,18 +240,32 @@ async def main():
+     big = {tf: 5_000_000 for tf in engines.candles.cfg.max_limit}
+     engines.candles.cfg = replace(engines.candles.cfg, max_limit=big)
+ 
+-    out = {"symbol": "XAUUSD", "start": start.isoformat(), "end": end.isoformat(),
+-           "stride_bars": stride, "entry_model": model.value, "variants": []}
++    out = {
++        "symbol": "XAUUSD",
++        "start": start.isoformat(),
++        "end": end.isoformat(),
++        "stride_bars": stride,
++        "entry_model": model.value,
++        "variants": [],
++    }
+     bias = BiasFunnel()
+     for i, mode in enumerate((SetupMode.STANDARD, SetupMode.AGGRESSIVE, SetupMode.CONSERVATIVE)):
+         res = await run_variant(engines, mode, model, start, end, stride, bias if i == 0 else None)
+         out["variants"].append(res)
+-        print(f"[done] {mode.value:12} {model.value:12} windows={res['windows']} "
+-              f"setups={res['unique_setups']} conf={res['technical']['reached_confirmation']} "
+-              f"eligible={res['technical']['technically_eligible']} captured={res['live'].get('captured',0)} "
+-              f"trades={res['trades']['closed']}", flush=True, file=sys.stderr)
+-    out["bias_funnel"] = {"steps": bias.steps, "bias_unavailable": bias.bias_unavailable,
+-                          "disagreement": bias.disagreement, "aligned": bias.aligned}
++        print(
++            f"[done] {mode.value:12} {model.value:12} windows={res['windows']} "
++            f"setups={res['unique_setups']} conf={res['technical']['reached_confirmation']} "
++            f"eligible={res['technical']['technically_eligible']} captured={res['live'].get('captured', 0)} "
++            f"trades={res['trades']['closed']}",
++            flush=True,
++            file=sys.stderr,
++        )
++    out["bias_funnel"] = {
++        "steps": bias.steps,
++        "bias_unavailable": bias.bias_unavailable,
++        "disagreement": bias.disagreement,
++        "aligned": bias.aligned,
++    }
+     print(json.dumps(out))
+ 
+ 
+diff --git a/services/api/scripts/diag_geometry.py b/services/api/scripts/diag_geometry.py
+index b134d57..7a6a462 100644
+--- a/services/api/scripts/diag_geometry.py
++++ b/services/api/scripts/diag_geometry.py
+@@ -15,6 +15,7 @@ minRrFinal=2.0; and decompose sweep->displacement->MSS->armed->touch->confirmati
+ 
+ Usage: python scripts/diag_geometry.py START END STRIDE
+ """
++
+ from __future__ import annotations
+ 
+ import asyncio
+@@ -25,13 +26,20 @@ from dataclasses import replace
+ from datetime import UTC, datetime
+ 
+ from app.config import get_settings
+-from app.domain.enums import Direction, EntryModel, EntryPlanStatus, SetupMode, SetupState, Timeframe, ConfirmationSignal
++from app.domain.enums import (
++    ConfirmationSignal,
++    Direction,
++    EntryModel,
++    EntryPlanStatus,
++    SetupMode,
++    SetupState,
++    Timeframe,
++)
+ from app.domain.models import get_instrument
+ from app.main import build_engines
+ from app.providers.registry import default_registry
+ from app.services.entry.engine import build_plan
+ from app.services.entry.models import Confirmation, entry_config
+-from app.services.paper.shared import candles_since
+ from app.services.setups.models import PROGRESS
+ from app.services.structure.engine import mean_true_range
+ 
+@@ -41,8 +49,11 @@ PREC = get_instrument("XAUUSD").price_precision
+ 
+ 
+ class Clock:
+-    def __init__(self, t): self.t = t
+-    def __call__(self): return self.t
++    def __init__(self, t):
++        self.t = t
++
++    def __call__(self):
++        return self.t
+ 
+ 
+ def hist_time(s, state):
+@@ -53,9 +64,17 @@ def hist_time(s, state):
+ 
+ 
+ def synth_conf(price, t):
+-    return Confirmation(model=EntryModel.LTF_REFINEMENT, timeframe=Timeframe.M5,
+-                        signal=ConfirmationSignal.MICRO_SHIFT, second_candle=False,
+-                        signal_at=t, confirmed_at=t, price=price, micro_level=None, detail="synthetic-at-stage")
++    return Confirmation(
++        model=EntryModel.LTF_REFINEMENT,
++        timeframe=Timeframe.M5,
++        signal=ConfirmationSignal.MICRO_SHIFT,
++        second_candle=False,
++        signal_at=t,
++        confirmed_at=t,
++        price=price,
++        micro_level=None,
++        detail="synthetic-at-stage",
++    )
+ 
+ 
+ async def atr_at(engines, at):
+@@ -82,10 +101,13 @@ async def collect(engines, mode, model, start, end, stride):
+             if cur is None or s.progress > cur["s"].progress or (s.terminal and not cur["s"].terminal):
+                 mss = struct.get(s.mss_event_id) if s.mss_event_id else None
+                 d = disp.get(s.displacement_event_id) if s.displacement_event_id else None
+-                rec[s.id] = {"s": s, "pools": list(run.pools),
+-                             "mss_known": mss.known_at if mss else None,
+-                             "mss_price": mss.level_price if mss else None,
+-                             "disp_known": d.known_at if d else None}
++                rec[s.id] = {
++                    "s": s,
++                    "pools": list(run.pools),
++                    "mss_known": mss.known_at if mss else None,
++                    "mss_price": mss.level_price if mss else None,
++                    "disp_known": d.known_at if d else None,
++                }
+         cursor += step
+     return rec
+ 
+@@ -96,9 +118,16 @@ def minutes(a, b):
+ 
+ async def analyze_mode(engines, mode, start, end, stride, conf15, model=EntryModel.LTF_REFINEMENT):
+     rec = await collect(engines, mode, model, start, end, stride)
+-    buckets = {k: 0 for k in ("VALID_CONFIRMED_ENTRY", "GOOD_AT_TOUCH_BUT_LATE",
+-                              "CONFIRMATION_IMPROVED_ENTRY", "CHASE_CORRECTLY_BLOCKED",
+-                              "BAD_GEOMETRY_FROM_START")}
++    buckets = {
++        k: 0
++        for k in (
++            "VALID_CONFIRMED_ENTRY",
++            "GOOD_AT_TOUCH_BUT_LATE",
++            "CONFIRMATION_IMPROVED_ENTRY",
++            "CHASE_CORRECTLY_BLOCKED",
++            "BAD_GEOMETRY_FROM_START",
++        )
++    }
+     old_rr_touch, new_rr_tp1_touch, new_rr_final_touch, rr_final_conf = [], [], [], []
+     rr_final_mid = []  # diagnostic: rr_final had entry been the zone midpoint (edge remains the real entry)
+     lat = {k: [] for k in ("sweep_disp", "disp_mss", "mss_armed", "armed_touch", "touch_15m", "touch_5m")}
+@@ -114,12 +143,15 @@ async def analyze_mode(engines, mode, start, end, stride, conf15, model=EntryMod
+         inv = s.invalidation_level
+         touch = hist_time(s, SetupState.ENTRY_ZONE_TOUCHED) or s.updated_at
+         atr_t = await atr_at(engines, touch)
+-        pt, whyt = build_plan(s.direction, inv, z, synth_conf(edge, touch), r["pools"],
+-                              touch, atr_t, ECFG, PREC)
++        pt, _whyt = build_plan(
++            s.direction, inv, z, synth_conf(edge, touch), r["pools"], touch, atr_t, ECFG, PREC
++        )
+         # Diagnostic only: R:R had the entry been the zone MIDPOINT instead of the edge (never affects
+-        # eligibility/capture/simulation; the edge is the sole entry reference). Recorded for later depth study.
+-        pmid, _ = build_plan(s.direction, inv, z, synth_conf(z.midpoint, touch), r["pools"],
+-                             touch, atr_t, ECFG, PREC)
++        # eligibility/capture/simulation; the edge is the sole entry reference).
++        # Recorded for later depth study.
++        pmid, _ = build_plan(
++            s.direction, inv, z, synth_conf(z.midpoint, touch), r["pools"], touch, atr_t, ECFG, PREC
++        )
+         # reconciliation: my earlier metric = edge->single DOL target, unbuffered stop
+         if s.target_price is not None and abs(edge - inv) > 0:
+             old_rr_touch.append(abs(s.target_price - edge) / abs(edge - inv))
+@@ -151,18 +183,26 @@ async def analyze_mode(engines, mode, start, end, stride, conf15, model=EntryMod
+         touch = hist_time(s, SetupState.ENTRY_ZONE_TOUCHED)
+         c5 = s.confirmation.confirmed_at if s.confirmation else None
+         c15 = conf15.get(s.id)
+-        for key, a, b in (("sweep_disp", sweep, r["mss_known"] if r["disp_known"] is None else r["disp_known"]),
+-                          ("disp_mss", r["disp_known"], r["mss_known"]),
+-                          ("mss_armed", r["mss_known"], armed), ("armed_touch", armed, touch),
+-                          ("touch_15m", touch, c15), ("touch_5m", touch, c5)):
++        for key, a, b in (
++            ("sweep_disp", sweep, r["mss_known"] if r["disp_known"] is None else r["disp_known"]),
++            ("disp_mss", r["disp_known"], r["mss_known"]),
++            ("mss_armed", r["mss_known"], armed),
++            ("armed_touch", armed, touch),
++            ("touch_15m", touch, c15),
++            ("touch_5m", touch, c5),
++        ):
+             m = minutes(a, b)
+             if m is not None and m >= 0:
+                 lat[key].append(m)
+ 
+-    def med(xs): return round(st.median(xs), 3) if xs else None
++    def med(xs):
++        return round(st.median(xs), 3) if xs else None
++
+     rejected = reached - buckets["VALID_CONFIRMED_ENTRY"]
+     return {
+-        "reached_zone": reached, "buckets": buckets, "rejected_denom": rejected,
++        "reached_zone": reached,
++        "buckets": buckets,
++        "rejected_denom": rejected,
+         "reconcile": {
+             "old_rr_touch_median": med(old_rr_touch),
+             "buildplan_rr_tp1_touch_median": med(new_rr_tp1_touch),
+@@ -185,8 +225,9 @@ async def main():
+     settings = get_settings()
+     provider = default_registry(settings.data_root).create(settings.market_data_provider)
+     engines = build_engines(settings, provider, Clock(end))
+-    engines.candles.cfg = replace(engines.candles.cfg,
+-                                  max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit})
++    engines.candles.cfg = replace(
++        engines.candles.cfg, max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit}
++    )
+     out = {"span": [start.isoformat(), end.isoformat()], "stride": stride, "model": model.value, "modes": {}}
+     for mode in (SetupMode.STANDARD, SetupMode.AGGRESSIVE, SetupMode.CONSERVATIVE):
+         conf15 = {}
+@@ -195,8 +236,11 @@ async def main():
+             conf15 = {i: r["s"].confirmation.confirmed_at for i, r in m15.items() if r["s"].confirmation}
+         out["modes"][mode.value] = await analyze_mode(engines, mode, start, end, stride, conf15, model)
+         b = out["modes"][mode.value]["buckets"]
+-        print(f"[done] {mode.value} reached={out['modes'][mode.value]['reached_zone']} {b}",
+-              file=sys.stderr, flush=True)
++        print(
++            f"[done] {mode.value} reached={out['modes'][mode.value]['reached_zone']} {b}",
++            file=sys.stderr,
++            flush=True,
++        )
+     print(json.dumps(out))
+ 
+ 
+diff --git a/services/api/scripts/diag_latency.py b/services/api/scripts/diag_latency.py
+index 4f391bc..9357cd4 100644
+--- a/services/api/scripts/diag_latency.py
++++ b/services/api/scripts/diag_latency.py
+@@ -14,6 +14,7 @@ Uses the same faithful stride-window replay as diag_funnel. All figures are caus
+ are fixed by closed candles). Excursions are bounded to [touch, confirmation] so the runoff bug cannot occur.
+ Usage: python scripts/diag_latency.py START END STRIDE
+ """
++
+ from __future__ import annotations
+ 
+ import asyncio
+@@ -32,8 +33,11 @@ from app.services.structure.engine import mean_true_range
+ 
+ 
+ class Clock:
+-    def __init__(self, t): self.t = t
+-    def __call__(self): return self.t
++    def __init__(self, t):
++        self.t = t
++
++    def __call__(self):
++        return self.t
+ 
+ 
+ def touch_time(s):
+@@ -53,9 +57,8 @@ async def confirmed_setups(engines, mode, model, start, end, stride):
+         clock.t = cursor
+         run = await setups.run("XAUUSD", mode, setups.cfg.default_bars, cursor, model)
+         for s in run.analysis.setups:
+-            if s.confirmation is not None and s.entry_plan is not None:
+-                if s.id not in seen:  # first confirmation sighting; confirmed_at is fixed
+-                    seen[s.id] = s
++            if s.confirmation is not None and s.entry_plan is not None and s.id not in seen:
++                seen[s.id] = s  # first confirmation sighting; confirmed_at is fixed
+         cursor += step
+     return seen
+ 
+@@ -73,8 +76,9 @@ async def main():
+     settings = get_settings()
+     provider = default_registry(settings.data_root).create(settings.market_data_provider)
+     engines = build_engines(settings, provider, Clock(end))
+-    engines.candles.cfg = replace(engines.candles.cfg,
+-                                  max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit})
++    engines.candles.cfg = replace(
++        engines.candles.cfg, max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit}
++    )
+ 
+     out = {"span": [start.isoformat(), end.isoformat()], "stride": stride, "modes": {}}
+     for mode in (SetupMode.STANDARD, SetupMode.AGGRESSIVE, SetupMode.CONSERVATIVE):
+@@ -97,8 +101,9 @@ async def main():
+             tt = touch_time(s)
+             mfe = mae = None
+             if tt is not None and risk_touch > 0:
+-                cs, _ = await candles_since(engines.candles, "XAUUSD", Timeframe.M5, tt,
+-                                            s.confirmation.confirmed_at)
++                cs, _ = await candles_since(
++                    engines.candles, "XAUUSD", Timeframe.M5, tt, s.confirmation.confirmed_at
++                )
+                 fav = adv = 0.0
+                 for c in cs:
+                     if not c.is_closed:
+@@ -106,32 +111,53 @@ async def main():
+                     fav = max(fav, (c.high - edge) if up else (edge - c.low))
+                     adv = max(adv, (edge - c.low) if up else (c.high - edge))
+                 mfe, mae = round(fav / risk_touch, 3), round(adv / risk_touch, 3)
+-            rows.append({
+-                "id": i, "dir": s.direction.value, "confirmed_at": s.confirmation.confirmed_at.isoformat(),
+-                "atr": round(atr, 3) if atr else None,
+-                "dist_ideal_atr": round(dist_ideal / atr, 3) if atr else None,
+-                "dist_beyond_zone_atr": round(dist_zone / atr, 3) if atr else None,
+-                "rr_touch": round(rr_touch, 3) if rr_touch else None,
+-                "rr_5m": round(p.rr_final, 3) if p.rr_final else None,
+-                "rr_15m": round(rr15[i], 3) if i in rr15 and rr15[i] else None,
+-                "chase_rejected": s.do_not_chase,
+-                "mfe_before_conf_r": mfe, "mae_before_conf_r": mae,
+-            })
+-
+-        def agg(key):
+-            xs = [r[key] for r in rows if r[key] is not None]
+-            return {"n": len(xs), "median": round(st.median(xs), 3) if xs else None,
+-                    "mean": round(st.fmean(xs), 3) if xs else None} if xs else {"n": 0}
++            rows.append(
++                {
++                    "id": i,
++                    "dir": s.direction.value,
++                    "confirmed_at": s.confirmation.confirmed_at.isoformat(),
++                    "atr": round(atr, 3) if atr else None,
++                    "dist_ideal_atr": round(dist_ideal / atr, 3) if atr else None,
++                    "dist_beyond_zone_atr": round(dist_zone / atr, 3) if atr else None,
++                    "rr_touch": round(rr_touch, 3) if rr_touch else None,
++                    "rr_5m": round(p.rr_final, 3) if p.rr_final else None,
++                    "rr_15m": round(rr15[i], 3) if rr15.get(i) else None,
++                    "chase_rejected": s.do_not_chase,
++                    "mfe_before_conf_r": mfe,
++                    "mae_before_conf_r": mae,
++                }
++            )
++
++        def agg(key, source_rows=rows):
++            xs = [r[key] for r in source_rows if r[key] is not None]
++            return (
++                {
++                    "n": len(xs),
++                    "median": round(st.median(xs), 3) if xs else None,
++                    "mean": round(st.fmean(xs), 3) if xs else None,
++                }
++                if xs
++                else {"n": 0}
++            )
++
+         out["modes"][mode.value] = {
+             "confirmed": len(rows),
+             "chase_rejected": sum(1 for r in rows if r["chase_rejected"]),
+-            "rr_touch": agg("rr_touch"), "rr_5m": agg("rr_5m"), "rr_15m": agg("rr_15m"),
+-            "dist_ideal_atr": agg("dist_ideal_atr"), "dist_beyond_zone_atr": agg("dist_beyond_zone_atr"),
+-            "mfe_before_conf_r": agg("mfe_before_conf_r"), "mae_before_conf_r": agg("mae_before_conf_r"),
++            "rr_touch": agg("rr_touch"),
++            "rr_5m": agg("rr_5m"),
++            "rr_15m": agg("rr_15m"),
++            "dist_ideal_atr": agg("dist_ideal_atr"),
++            "dist_beyond_zone_atr": agg("dist_beyond_zone_atr"),
++            "mfe_before_conf_r": agg("mfe_before_conf_r"),
++            "mae_before_conf_r": agg("mae_before_conf_r"),
+             "rows": rows,
+         }
+-        print(f"[done] {mode.value} confirmed={len(rows)} chase_rejected="
+-              f"{sum(1 for r in rows if r['chase_rejected'])}", file=sys.stderr, flush=True)
++        print(
++            f"[done] {mode.value} confirmed={len(rows)} chase_rejected="
++            f"{sum(1 for r in rows if r['chase_rejected'])}",
++            file=sys.stderr,
++            flush=True,
++        )
+     print(json.dumps(out))
+ 
+ 
+diff --git a/services/api/scripts/diag_overlap.py b/services/api/scripts/diag_overlap.py
+index e96cfed..5796797 100644
+--- a/services/api/scripts/diag_overlap.py
++++ b/services/api/scripts/diag_overlap.py
+@@ -5,6 +5,7 @@ models, so an id eligible under both means the same sweep produced a tradeable s
+ Reports, per mode: eligible under model A only, model B only, and both.
+ Usage: python scripts/diag_overlap.py START END STRIDE MODEL_A MODEL_B
+ """
++
+ from __future__ import annotations
+ 
+ import asyncio
+@@ -20,8 +21,11 @@ from app.providers.registry import default_registry
+ 
+ 
+ class Clock:
+-    def __init__(self, t): self.t = t
+-    def __call__(self): return self.t
++    def __init__(self, t):
++        self.t = t
++
++    def __call__(self):
++        return self.t
+ 
+ 
+ def model_of(name):
+@@ -52,21 +56,34 @@ async def main():
+     settings = get_settings()
+     provider = default_registry(settings.data_root).create(settings.market_data_provider)
+     engines = build_engines(settings, provider, Clock(end))
+-    engines.candles.cfg = replace(engines.candles.cfg,
+-                                  max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit})
+-    out = {"span": [start.isoformat(), end.isoformat()], "stride": stride,
+-           "model_a": a.value, "model_b": b.value, "modes": {}}
++    engines.candles.cfg = replace(
++        engines.candles.cfg, max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit}
++    )
++    out = {
++        "span": [start.isoformat(), end.isoformat()],
++        "stride": stride,
++        "model_a": a.value,
++        "model_b": b.value,
++        "modes": {},
++    }
+     for mode in (SetupMode.STANDARD, SetupMode.AGGRESSIVE, SetupMode.CONSERVATIVE):
+         ea = await eligible_ids(engines, mode, a, start, end, stride)
+         eb = await eligible_ids(engines, mode, b, start, end, stride)
+         both = ea & eb
+         out["modes"][mode.value] = {
+-            "eligible_a": len(ea), "eligible_b": len(eb),
+-            "a_only": len(ea - eb), "b_only": len(eb - ea), "both": len(both),
++            "eligible_a": len(ea),
++            "eligible_b": len(eb),
++            "a_only": len(ea - eb),
++            "b_only": len(eb - ea),
++            "both": len(both),
+             "union": len(ea | eb),
+         }
+-        print(f"[done] {mode.value} {a.value}={len(ea)} {b.value}={len(eb)} both={len(both)} "
+-              f"a_only={len(ea-eb)} b_only={len(eb-ea)}", file=sys.stderr, flush=True)
++        print(
++            f"[done] {mode.value} {a.value}={len(ea)} {b.value}={len(eb)} both={len(both)} "
++            f"a_only={len(ea - eb)} b_only={len(eb - ea)}",
++            file=sys.stderr,
++            flush=True,
++        )
+     print(json.dumps(out))
+ 
+ 
+diff --git a/services/api/scripts/diag_overlap4.py b/services/api/scripts/diag_overlap4.py
+index f835d2d..cd3bdb4 100644
+--- a/services/api/scripts/diag_overlap4.py
++++ b/services/api/scripts/diag_overlap4.py
+@@ -4,6 +4,7 @@ specifically the NO-WICK-ONLY eligible opportunities (eligible under No-Wick but
+ Setup ids are sweep-derived and shared across entry models, so an id shared across models means the same
+ sweep produced a tradeable setup under each. Usage: python scripts/diag_overlap4.py START END STRIDE
+ """
++
+ from __future__ import annotations
+ 
+ import asyncio
+@@ -26,8 +27,11 @@ MODELS = {
+ 
+ 
+ class Clock:
+-    def __init__(self, t): self.t = t
+-    def __call__(self): return self.t
++    def __init__(self, t):
++        self.t = t
++
++    def __call__(self):
++        return self.t
+ 
+ 
+ async def eligible_ids(engines, mode, model, start, end, stride):
+@@ -52,8 +56,9 @@ async def main():
+     settings = get_settings()
+     provider = default_registry(settings.data_root).create(settings.market_data_provider)
+     engines = build_engines(settings, provider, Clock(end))
+-    engines.candles.cfg = replace(engines.candles.cfg,
+-                                  max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit})
++    engines.candles.cfg = replace(
++        engines.candles.cfg, max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit}
++    )
+     out = {"span": [start.isoformat(), end.isoformat()], "stride": stride, "modes": {}}
+     for mode in (SetupMode.STANDARD, SetupMode.AGGRESSIVE, SetupMode.CONSERVATIVE):
+         sets = {}
+@@ -68,8 +73,13 @@ async def main():
+             "pairwise_with_nowick": {k: len(sets["NOWICK"] & sets[k]) for k in ("FVG", "IFVG", "CR")},
+             "union_all": len(sets["FVG"] | sets["IFVG"] | sets["CR"] | sets["NOWICK"]),
+         }
+-        print(f"[done] {mode.value} " + " ".join(f"{k}={len(v)}" for k, v in sets.items())
+-              + f" nowick_only={len(nowick_only)}", file=sys.stderr, flush=True)
++        print(
++            f"[done] {mode.value} "
++            + " ".join(f"{k}={len(v)}" for k, v in sets.items())
++            + f" nowick_only={len(nowick_only)}",
++            file=sys.stderr,
++            flush=True,
++        )
+     print(json.dumps(out))
+ 
+ 
+diff --git a/services/api/scripts/diag_overlap5.py b/services/api/scripts/diag_overlap5.py
+index d757d1f..17955ab 100644
+--- a/services/api/scripts/diag_overlap5.py
++++ b/services/api/scripts/diag_overlap5.py
+@@ -1,8 +1,12 @@
+-"""Five-way entry-model overlap (measurement only): FVG, IFVG, CONSERVATIVE_RETEST, NO_WICK_REBALANCE, BREAKER.
+-Reports, per mode, technically-eligible counts per model and each model's *-only set (eligible under that model
++"""Five-way entry-model overlap (measurement only).
++
++Models: FVG, IFVG, CONSERVATIVE_RETEST, NO_WICK_REBALANCE, and BREAKER.
++Reports, per mode, technically-eligible counts per model and each model's *-only set
++(eligible under that model
+ and none of the other four). Setup ids are sweep-derived and shared across entry models.
+ Usage: python scripts/diag_overlap5.py START END STRIDE
+ """
++
+ from __future__ import annotations
+ 
+ import asyncio
+@@ -26,8 +30,11 @@ MODELS = {
+ 
+ 
+ class Clock:
+-    def __init__(self, t): self.t = t
+-    def __call__(self): return self.t
++    def __init__(self, t):
++        self.t = t
++
++    def __call__(self):
++        return self.t
+ 
+ 
+ async def eligible_ids(engines, mode, model, start, end, stride):
+@@ -52,12 +59,15 @@ async def main():
+     settings = get_settings()
+     provider = default_registry(settings.data_root).create(settings.market_data_provider)
+     engines = build_engines(settings, provider, Clock(end))
+-    engines.candles.cfg = replace(engines.candles.cfg,
+-                                  max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit})
++    engines.candles.cfg = replace(
++        engines.candles.cfg, max_limit={tf: 5_000_000 for tf in engines.candles.cfg.max_limit}
++    )
+     out = {"span": [start.isoformat(), end.isoformat()], "stride": stride, "modes": {}}
+     for mode in (SetupMode.STANDARD, SetupMode.AGGRESSIVE, SetupMode.CONSERVATIVE):
+-        sets = {name: await eligible_ids(engines, mode, model, start, end, stride)
+-                for name, model in MODELS.items()}
++        sets = {
++            name: await eligible_ids(engines, mode, model, start, end, stride)
++            for name, model in MODELS.items()
++        }
+         only = {}
+         for name in MODELS:
+             others = set().union(*(sets[o] for o in MODELS if o != name))
+@@ -68,8 +78,14 @@ async def main():
+             "only": only,
+             "union_all": len(union),
+         }
+-        print(f"[done] {mode.value} " + " ".join(f"{k}={len(v)}" for k, v in sets.items())
+-              + " | only " + " ".join(f"{k}={v}" for k, v in only.items()), file=sys.stderr, flush=True)
++        print(
++            f"[done] {mode.value} "
++            + " ".join(f"{k}={len(v)}" for k, v in sets.items())
++            + " | only "
++            + " ".join(f"{k}={v}" for k, v in only.items()),
++            file=sys.stderr,
++            flush=True,
++        )
+     print(json.dumps(out))
+ 
+ 
+diff --git a/services/api/tests/integration/test_api_and_db.py b/services/api/tests/integration/test_api_and_db.py
+index 517d464..28cbb26 100644
+--- a/services/api/tests/integration/test_api_and_db.py
++++ b/services/api/tests/integration/test_api_and_db.py
+@@ -195,7 +195,7 @@ def test_chart_endpoints_on_validated_history(tmp_path):
+     decision = c.get("/api/v1/market-state/XAUUSD").json()
+     assert decision["verdict"] == "UNAVAILABLE" and "DATA_STALE" in decision["blockers"]
+     status = c.get("/api/v1/system/status").json()
+-    assert status["provider"]["provider"] == "historical_file" and status["phase"] == 22
++    assert status["provider"]["provider"] == "historical_file" and status["phase"] == 23
+ 
+ 
+ def test_chart_request_errors(tmp_path):
+@@ -316,6 +316,20 @@ def test_setups_endpoint_on_history(tmp_path):
+     assert c.get("/api/v1/setups/BTCUSD").status_code == 404
+ 
+ 
++def test_silver_bullet_endpoint_is_separate_and_research_only(tmp_path):
++    c = chart_client(tmp_path)
++    response = c.get("/api/v1/silver-bullet/XAUUSD?bars=1000")
++    assert response.status_code == 200
++    body = response.json()
++    assert body["setupType"] == "SILVER_BULLET"
++    assert body["timeframe"] == "M5" and body["candleCount"] == 1000
++    assert body["verdictAuthority"] == "RESEARCH_ONLY"
++    assert body["eligibleForDecision"] is False and body["ineligibility"] == ["DATA_STALE"]
++    assert all(setup["setupType"] == "SILVER_BULLET" for setup in body["setups"])
++    assert c.get("/api/v1/silver-bullet/XAUUSD?bars=0").status_code == 422
++    assert c.get("/api/v1/silver-bullet/BTCUSD").status_code == 404
++
++
+ def test_risk_endpoints_read_the_local_profile_and_size_without_storing(tmp_path):
+     import json
+ 
+diff --git a/services/api/tests/integration/test_backtest_api.py b/services/api/tests/integration/test_backtest_api.py
+index f98c119..2cca8ac 100644
+--- a/services/api/tests/integration/test_backtest_api.py
++++ b/services/api/tests/integration/test_backtest_api.py
+@@ -84,7 +84,7 @@ def wait(c, run_id, statuses=("COMPLETED", "FAILED", "CANCELLED"), timeout=300):
+ def test_backtest_replay_capture_ab_walk_forward(tmp_path, monkeypatch):
+     inject(monkeypatch)
+     c, folder = client(tmp_path)
+-    assert c.get("/api/v1/system/status").json()["phase"] == 22
++    assert c.get("/api/v1/system/status").json()["phase"] == 23
+     assert c.get("/api/v1/backtests").json()["runs"] == []
+     started = c.post("/api/v1/backtests", json=body())
+     assert started.status_code == 202, started.text
+diff --git a/services/api/tests/integration/test_macro_api.py b/services/api/tests/integration/test_macro_api.py
+index 3c86710..7b4c141 100644
+--- a/services/api/tests/integration/test_macro_api.py
++++ b/services/api/tests/integration/test_macro_api.py
+@@ -34,7 +34,7 @@ def test_macro_endpoint_live_vintage_key_and_failures(tmp_path, monkeypatch):
+ 
+     now = T0 + timedelta(days=30)
+     c, now = app_client(tmp_path, monkeypatch, fake_transport(gold_bearish_series(now.date(), 60), calls))
+-    assert c.get("/api/v1/system/status").json()["phase"] == 22
++    assert c.get("/api/v1/system/status").json()["phase"] == 23
+     live = c.get("/api/v1/macro/XAUUSD")
+     body = live.json()
+     assert live.status_code == 200 and KEY not in live.text
+diff --git a/services/api/tests/integration/test_pd_arrays_api.py b/services/api/tests/integration/test_pd_arrays_api.py
+index 7f646c6..e9a8b7f 100644
+--- a/services/api/tests/integration/test_pd_arrays_api.py
++++ b/services/api/tests/integration/test_pd_arrays_api.py
+@@ -29,7 +29,7 @@ def t(s: str) -> datetime:
+ 
+ def test_pd_arrays_consistency_agreement_and_no_lookahead(tmp_path):
+     c = client(tmp_path)
+-    assert c.get("/api/v1/system/status").json()["phase"] == 22
++    assert c.get("/api/v1/system/status").json()["phase"] == 23
+     end = T0 + timedelta(days=9, hours=12)  # Wednesday of the second week
+     r = c.get(f"/api/v1/pd-arrays/XAUUSD?timeframe=M15&bars=400&end={iso(end)}")
+     assert r.status_code == 200, r.text
+diff --git a/services/api/tests/unit/test_contracts_providers.py b/services/api/tests/unit/test_contracts_providers.py
+index ad6eb08..3f3458f 100644
+--- a/services/api/tests/unit/test_contracts_providers.py
++++ b/services/api/tests/unit/test_contracts_providers.py
+@@ -40,7 +40,7 @@ def test_enums_match_the_language_neutral_spec_both_ways():
+ 
+ def test_strategy_version_and_instruments():
+     sv = load_spec("strategy_version")
+-    assert sv["phase"] == 22 and sv["verdictAuthority"] == "FAIL_SAFE_ONLY"
++    assert sv["phase"] == 23 and sv["verdictAuthority"] == "FAIL_SAFE_ONLY"
+     xau = get_instrument("xauusd")
+     assert xau is not None and xau.deeply_validated
+     assert [i for i in load_spec("instruments")["instruments"] if i["deeplyValidated"]] == [
+diff --git a/services/api/tests/unit/test_entry_breaker.py b/services/api/tests/unit/test_entry_breaker.py
+index 126fb46..70f00a1 100644
+--- a/services/api/tests/unit/test_entry_breaker.py
++++ b/services/api/tests/unit/test_entry_breaker.py
+@@ -4,7 +4,6 @@ POTENTIAL creation/known time (no lookahead); POTENTIAL breakers never qualify;
+ entry models; and the service-level converter maps only confirmed breakers into entry candidates."""
+ 
+ from dataclasses import replace
+-from datetime import UTC, datetime, timedelta
+ 
+ from app.domain.enums import (
+     BreakerStatus,
+@@ -25,19 +24,45 @@ from tests.unit.test_setups import BAR, CFG, SCFG, at, candle, candles, fvg, inp
+ S = SetupState
+ 
+ 
+-def brk(created_k, avail_k, known_k=None, low=1999.0, high=2001.0, quality=60.0, invalidated_at=None,
+-        direction=Direction.BULLISH):
++def brk(
++    created_k,
++    avail_k,
++    known_k=None,
++    low=1999.0,
++    high=2001.0,
++    quality=60.0,
++    invalidated_at=None,
++    direction=Direction.BULLISH,
++):
+     """A breaker entry candidate + its BREAKER_CONFIRMED availability time (avail_k), which may be much later
+     than its POTENTIAL known time (known_k)."""
+     known = at(known_k if known_k is not None else created_k) + BAR
+     p = PdArray(
+-        id="BRK-1", symbol="XAUUSD", timeframe=Timeframe.M15, type=PdArrayType.BREAKER, direction=direction,
+-        high=high, low=low, midpoint=(low + high) / 2, created_at=at(created_k), known_at=known,
+-        source_id="ob", size_atr=0.0,
+-        state=PdArrayState.INVALIDATED if invalidated_at else PdArrayState.FRESH, ifvg_status=None,
+-        mitigation_pct=0.0, touched_at=None, invalidated_at=invalidated_at, bars_since_created=0, freshness=1.0,
+-        quality_score=quality, quality=QualityBreakdown(size=0.0, displacement=0.0, structure=0.0),
+-        displacement_event_id=None, structure_event_id=None, timeframe_weight=0.0, distance_atr=None,
++        id="BRK-1",
++        symbol="XAUUSD",
++        timeframe=Timeframe.M15,
++        type=PdArrayType.BREAKER,
++        direction=direction,
++        high=high,
++        low=low,
++        midpoint=(low + high) / 2,
++        created_at=at(created_k),
++        known_at=known,
++        source_id="ob",
++        size_atr=0.0,
++        state=PdArrayState.INVALIDATED if invalidated_at else PdArrayState.FRESH,
++        ifvg_status=None,
++        mitigation_pct=0.0,
++        touched_at=None,
++        invalidated_at=invalidated_at,
++        bars_since_created=0,
++        freshness=1.0,
++        quality_score=quality,
++        quality=QualityBreakdown(size=0.0, displacement=0.0, structure=0.0),
++        displacement_event_id=None,
++        structure_event_id=None,
++        timeframe_weight=0.0,
++        distance_atr=None,
+     )
+     return p, {"BRK-1": at(avail_k) + BAR}
+ 
+@@ -103,10 +128,15 @@ def test_converter_only_maps_confirmed_breakers():
+         def __init__(self, pid, typ, when):
+             self.pd_array_id, self.type, self.known_at = pid, typ, when
+ 
+-    zones = [Z(BreakerStatus.CONFIRMED_BREAKER, "z1"), Z(BreakerStatus.POTENTIAL_BREAKER, "z2"),
+-             Z(BreakerStatus.CONFIRMED_BREAKER, "z3")]  # z3 confirmed but no event -> skipped
+-    events = [E("z1", PdEventType.BREAKER_CONFIRMED, at(6) + BAR),
+-              E("z2", PdEventType.BREAKER_POTENTIAL, at(5) + BAR)]
++    zones = [
++        Z(BreakerStatus.CONFIRMED_BREAKER, "z1"),
++        Z(BreakerStatus.POTENTIAL_BREAKER, "z2"),
++        Z(BreakerStatus.CONFIRMED_BREAKER, "z3"),
++    ]  # z3 confirmed but no event -> skipped
++    events = [
++        E("z1", PdEventType.BREAKER_CONFIRMED, at(6) + BAR),
++        E("z2", PdEventType.BREAKER_POTENTIAL, at(5) + BAR),
++    ]
+     arrs, times = _breaker_arrays(zones, events)
+     assert [a.id for a in arrs] == ["BRK-z1"] and times == {"BRK-z1": at(6) + BAR}
+     assert arrs[0].type is PdArrayType.BREAKER and (arrs[0].low, arrs[0].high) == (1999.0, 2001.0)
+@@ -131,14 +161,25 @@ def test_full_pipeline_breaker_no_lookahead_prefix_property():
+     for k in range(440):
+         o = price
+         c = round(o + rng.gauss(0, 2.2) * (3 if rng.random() < 0.13 else 1), 2)
+-        series.append(candle(k - 100, o, round(max(o, c) + abs(rng.gauss(0, 0.6)), 2),
+-                             round(min(o, c) - abs(rng.gauss(0, 0.6)), 2), c))
++        series.append(
++            candle(
++                k - 100,
++                o,
++                round(max(o, c) + abs(rng.gauss(0, 0.6)), 2),
++                round(min(o, c) - abs(rng.gauss(0, 0.6)), 2),
++                c,
++            )
++        )
+         price = c
+ 
+     def pipeline(cs):
+-        scfg, lcfg, dcfg, fcfg, pcfg = (StructureConfig.from_spec(), LiquidityConfig.from_spec(),
+-                                        DisplacementConfig.from_spec(), FvgConfig.from_spec(),
+-                                        PdArraysConfig.from_spec())
++        scfg, lcfg, dcfg, fcfg, pcfg = (
++            StructureConfig.from_spec(),
++            LiquidityConfig.from_spec(),
++            DisplacementConfig.from_spec(),
++            FvgConfig.from_spec(),
++            PdArraysConfig.from_spec(),
++        )
+         swings, sev, *_ = structure_analyze(cs, scfg)
+         pools, lev, _, _ = liquidity_analyze(cs, swings, lcfg)
+         sev = qualify_structure(sev, lev, pools, swings, cs, lcfg)
+@@ -154,10 +195,21 @@ def test_full_pipeline_breaker_no_lookahead_prefix_property():
+         brk_arrays, confirmed = _breaker_arrays(zones, events)
+         loose = replace(CFG, expire_at_trading_day_end=False)
+         return run_setups(
+-            Inputs(candles=cs, structure=sev, swings=swings, liquidity_events=lev, pools=pools,
+-                   pd_arrays=[*arrays, *brk_arrays], htf_events={"D1": sev, "H4": sev},
+-                   entry_model=EntryModel.BREAKER, breaker_confirmed_at=confirmed),
+-            loose, SCFG, SetupMode.AGGRESSIVE)[0]
++            Inputs(
++                candles=cs,
++                structure=sev,
++                swings=swings,
++                liquidity_events=lev,
++                pools=pools,
++                pd_arrays=[*arrays, *brk_arrays],
++                htf_events={"D1": sev, "H4": sev},
++                entry_model=EntryModel.BREAKER,
++                breaker_confirmed_at=confirmed,
++            ),
++            loose,
++            SCFG,
++            SetupMode.AGGRESSIVE,
++        )[0]
+ 
+     full = pipeline(series)
+     for k in (160, 300, 439):
+diff --git a/services/api/tests/unit/test_entry_conservative_retest.py b/services/api/tests/unit/test_entry_conservative_retest.py
+index c54a28a..eca2368 100644
+--- a/services/api/tests/unit/test_entry_conservative_retest.py
++++ b/services/api/tests/unit/test_entry_conservative_retest.py
+@@ -2,13 +2,10 @@
+ but confirms on a retest (REJECTION_CLOSE on M15) instead of a MICRO_SHIFT; the per-model confirmation
+ override is wired correctly and does NOT leak into the production models."""
+ 
+-from dataclasses import replace
+-
+-from app.domain.enums import ConfirmationSignal, Direction, EntryModel, SetupMode, SetupState, Timeframe
++from app.domain.enums import ConfirmationSignal, EntryModel, SetupMode, SetupState, Timeframe
+ from app.services.entry.models import entry_config
+-from app.services.setups.engine import Inputs, SetupMachine, run_setups
+-from app.services.setups.models import SetupConfig
+ from app.services.sessions.models import SessionConfig
++from app.services.setups.engine import SetupMachine, run_setups
+ from tests.unit.test_setups import BAR, CFG, SCFG, at, candles, inputs, states
+ 
+ S = SetupState
+@@ -27,7 +24,9 @@ def machine(model):
+ 
+ 
+ def test_override_wiring_and_no_leak_into_production_models():
+-    assert machine(EntryModel.CONSERVATIVE_RETEST).confirm_rules.signals == {ConfirmationSignal.REJECTION_CLOSE}
++    assert machine(EntryModel.CONSERVATIVE_RETEST).confirm_rules.signals == {
++        ConfirmationSignal.REJECTION_CLOSE
++    }
+     # production models keep the mode's confirmation (STANDARD -> MICRO_SHIFT), unchanged
+     assert machine(EntryModel.M15_CLOSE).confirm_rules == ECFG.confirmation[SetupMode.STANDARD]
+     assert machine(EntryModel.LTF_REFINEMENT).confirm_rules == ECFG.confirmation[SetupMode.STANDARD]
+diff --git a/services/api/tests/unit/test_entry_ifvg.py b/services/api/tests/unit/test_entry_ifvg.py
+index 3b12f5d..58ef729 100644
+--- a/services/api/tests/unit/test_entry_ifvg.py
++++ b/services/api/tests/unit/test_entry_ifvg.py
+@@ -3,7 +3,6 @@ availability gate uses the IFVG_CONFIRMED event time, never the earlier POTENTIA
+ and it is isolated from the production FVG path (FVG model ignores IFVG zones and vice versa)."""
+ 
+ from dataclasses import replace
+-from datetime import UTC, datetime, timedelta
+ 
+ from app.domain.enums import (
+     Direction,
+@@ -13,30 +12,54 @@ from app.domain.enums import (
+     PdArrayType,
+     SetupMode,
+     SetupState,
+-    StructureEventType,
+     Timeframe,
+ )
+ from app.services.fvg.engine import FvgConfig, PdArray, QualityBreakdown, find_fvgs, fvg_index, run_fvgs
+ from app.services.setups.engine import Inputs, run_setups
+-from app.services.setups.models import SetupConfig
+-from tests.unit.test_setups import BAR, CFG, SCFG, at, candle, candles, event, fvg, inputs, sweep, states
++from tests.unit.test_setups import BAR, CFG, SCFG, at, candle, fvg, inputs, states
+ 
+ S = SetupState
+ 
+ 
+-def ifvg(created_k, avail_k, known_k=None, low=1999.0, high=2001.0, quality=60.0,
+-         status=IfvgStatus.CONFIRMED_IFVG, direction=Direction.BULLISH, invalidated_at=None):
+-    """A CONFIRMED IFVG whose POTENTIAL known_at (known_k) may be far EARLIER than its confirmation (avail_k)."""
++def ifvg(
++    created_k,
++    avail_k,
++    known_k=None,
++    low=1999.0,
++    high=2001.0,
++    quality=60.0,
++    status=IfvgStatus.CONFIRMED_IFVG,
++    direction=Direction.BULLISH,
++    invalidated_at=None,
++):
++    """A CONFIRMED IFVG with a POTENTIAL known_at that may precede confirmation."""
+     known = at(known_k if known_k is not None else created_k) + BAR
+     return PdArray(
+-        id="IFVG-1", symbol="XAUUSD", timeframe=Timeframe.M15, type=PdArrayType.IFVG, direction=direction,
+-        high=high, low=low, midpoint=(low + high) / 2, created_at=at(created_k), known_at=known,
+-        source_id="FVG-src", size_atr=1.0,
++        id="IFVG-1",
++        symbol="XAUUSD",
++        timeframe=Timeframe.M15,
++        type=PdArrayType.IFVG,
++        direction=direction,
++        high=high,
++        low=low,
++        midpoint=(low + high) / 2,
++        created_at=at(created_k),
++        known_at=known,
++        source_id="FVG-src",
++        size_atr=1.0,
+         state=PdArrayState.INVALIDATED if invalidated_at else PdArrayState.FRESH,
+-        ifvg_status=status, mitigation_pct=0.0, touched_at=None, invalidated_at=invalidated_at,
+-        bars_since_created=0, freshness=1.0, quality_score=quality,
++        ifvg_status=status,
++        mitigation_pct=0.0,
++        touched_at=None,
++        invalidated_at=invalidated_at,
++        bars_since_created=0,
++        freshness=1.0,
++        quality_score=quality,
+         quality=QualityBreakdown(size=1.0, displacement=0.5, structure=1.0),
+-        displacement_event_id="D-1", structure_event_id="E-MSS", timeframe_weight=0.55, distance_atr=None,
++        displacement_event_id="D-1",
++        structure_event_id="E-MSS",
++        timeframe_weight=0.55,
++        distance_atr=None,
+     ), {"IFVG-1": at(avail_k) + BAR}
+ 
+ 
+@@ -96,6 +119,7 @@ def test_full_pipeline_ifvg_no_lookahead_prefix_property():
+     setups over growing prefixes: every prefix must equal the truncation of the full run (causal)."""
+     import random
+ 
++    from app.domain.enums import FvgEventType
+     from app.services.displacement.engine import DisplacementConfig, detect
+     from app.services.displacement.engine import qualify_structure as qualify_displacement
+     from app.services.liquidity.engine import analyze as liquidity_analyze
+@@ -103,20 +127,30 @@ def test_full_pipeline_ifvg_no_lookahead_prefix_property():
+     from app.services.liquidity.models import LiquidityConfig
+     from app.services.structure.engine import analyze as structure_analyze
+     from app.services.structure.models import StructureConfig
+-    from app.domain.enums import FvgEventType
+ 
+     rng = random.Random(7)
+     series, price = [], 2000.0
+     for k in range(420):
+         o = price
+         c = round(o + rng.gauss(0, 1.8) * (3 if rng.random() < 0.1 else 1), 2)
+-        series.append(candle(k - 100, o, round(max(o, c) + abs(rng.gauss(0, 0.8)), 2),
+-                             round(min(o, c) - abs(rng.gauss(0, 0.8)), 2), c))
++        series.append(
++            candle(
++                k - 100,
++                o,
++                round(max(o, c) + abs(rng.gauss(0, 0.8)), 2),
++                round(min(o, c) - abs(rng.gauss(0, 0.8)), 2),
++                c,
++            )
++        )
+         price = c
+ 
+     def pipeline(cs):
+-        scfg, lcfg, dcfg, fcfg = (StructureConfig.from_spec(), LiquidityConfig.from_spec(),
+-                                  DisplacementConfig.from_spec(), FvgConfig.from_spec())
++        scfg, lcfg, dcfg, fcfg = (
++            StructureConfig.from_spec(),
++            LiquidityConfig.from_spec(),
++            DisplacementConfig.from_spec(),
++            FvgConfig.from_spec(),
++        )
+         swings, sev, *_ = structure_analyze(cs, scfg)
+         pools, lev, _, _ = liquidity_analyze(cs, swings, lcfg)
+         sev = qualify_structure(sev, lev, pools, swings, cs, lcfg)
+@@ -127,10 +161,21 @@ def test_full_pipeline_ifvg_no_lookahead_prefix_property():
+         confirmed = {e.pd_array_id: e.known_at for e in events if e.type is FvgEventType.IFVG_CONFIRMED}
+         loose = replace(CFG, expire_at_trading_day_end=False)
+         return run_setups(
+-            Inputs(candles=cs, structure=sev, swings=swings, liquidity_events=lev, pools=pools,
+-                   pd_arrays=arrays, htf_events={"D1": sev, "H4": sev}, entry_model=EntryModel.IFVG,
+-                   ifvg_confirmed_at=confirmed),
+-            loose, SCFG, SetupMode.AGGRESSIVE)[0]
++            Inputs(
++                candles=cs,
++                structure=sev,
++                swings=swings,
++                liquidity_events=lev,
++                pools=pools,
++                pd_arrays=arrays,
++                htf_events={"D1": sev, "H4": sev},
++                entry_model=EntryModel.IFVG,
++                ifvg_confirmed_at=confirmed,
++            ),
++            loose,
++            SCFG,
++            SetupMode.AGGRESSIVE,
++        )[0]
+ 
+     full = pipeline(series)
+     for k in (150, 260, 419):
+diff --git a/services/api/tests/unit/test_entry_no_wick.py b/services/api/tests/unit/test_entry_no_wick.py
+index d4382ab..112ef5f 100644
+--- a/services/api/tests/unit/test_entry_no_wick.py
++++ b/services/api/tests/unit/test_entry_no_wick.py
+@@ -4,7 +4,6 @@ from the FVG/IFVG paths; qualification uses only causal timestamps (no future re
+ converter turns significant No-Wick zones into entry candidates without lookahead."""
+ 
+ from dataclasses import replace
+-from datetime import UTC, datetime, timedelta
+ 
+ from app.domain.enums import (
+     Direction,
+@@ -18,21 +17,46 @@ from app.domain.enums import (
+ from app.services.fvg.engine import PdArray, QualityBreakdown
+ from app.services.setups.engine import Inputs, run_setups
+ from app.services.setups.service import _no_wick_zone_arrays
+-from tests.unit.test_setups import BAR, CFG, SCFG, at, candle, candles, fvg, inputs, states
++from tests.unit.test_setups import BAR, CFG, SCFG, at, candle, fvg, inputs, states
+ 
+ S = SetupState
+ 
+ 
+-def nw(created_k, known_k, low=1999.0, high=2001.0, quality=60.0, invalidated_at=None,
+-       direction=Direction.BULLISH):
++def nw(
++    created_k,
++    known_k,
++    low=1999.0,
++    high=2001.0,
++    quality=60.0,
++    invalidated_at=None,
++    direction=Direction.BULLISH,
++):
+     return PdArray(
+-        id="NW-1", symbol="XAUUSD", timeframe=Timeframe.M15, type=PdArrayType.NO_WICK, direction=direction,
+-        high=high, low=low, midpoint=(low + high) / 2, created_at=at(created_k), known_at=at(known_k) + BAR,
+-        source_id="nwz", size_atr=0.0,
+-        state=PdArrayState.INVALIDATED if invalidated_at else PdArrayState.FRESH, ifvg_status=None,
+-        mitigation_pct=0.0, touched_at=None, invalidated_at=invalidated_at, bars_since_created=0,
+-        freshness=1.0, quality_score=quality, quality=QualityBreakdown(size=0.0, displacement=0.0, structure=0.0),
+-        displacement_event_id=None, structure_event_id=None, timeframe_weight=0.0, distance_atr=None,
++        id="NW-1",
++        symbol="XAUUSD",
++        timeframe=Timeframe.M15,
++        type=PdArrayType.NO_WICK,
++        direction=direction,
++        high=high,
++        low=low,
++        midpoint=(low + high) / 2,
++        created_at=at(created_k),
++        known_at=at(known_k) + BAR,
++        source_id="nwz",
++        size_atr=0.0,
++        state=PdArrayState.INVALIDATED if invalidated_at else PdArrayState.FRESH,
++        ifvg_status=None,
++        mitigation_pct=0.0,
++        touched_at=None,
++        invalidated_at=invalidated_at,
++        bars_since_created=0,
++        freshness=1.0,
++        quality_score=quality,
++        quality=QualityBreakdown(size=0.0, displacement=0.0, structure=0.0),
++        displacement_event_id=None,
++        structure_event_id=None,
++        timeframe_weight=0.0,
++        distance_atr=None,
+     )
+ 
+ 
+@@ -87,7 +111,9 @@ def test_converter_significance_and_fields():
+             self.relevance_score = 55.0
+             self.zone = zone
+ 
+-    arrs = _no_wick_zone_arrays([E(Z(2001.0, 1999.0)), E(None), E(Z(2000.0, 2000.0))], "XAUUSD", Timeframe.M15)
++    arrs = _no_wick_zone_arrays(
++        [E(Z(2001.0, 1999.0)), E(None), E(Z(2000.0, 2000.0))], "XAUUSD", Timeframe.M15
++    )
+     assert len(arrs) == 1  # zone=None skipped; degenerate top<=bottom skipped
+     a = arrs[0]
+     assert a.type is PdArrayType.NO_WICK and (a.low, a.high) == (1999.0, 2001.0)
+@@ -114,14 +140,25 @@ def test_full_pipeline_no_wick_no_lookahead_prefix_property():
+     for k in range(420):
+         o = price
+         c = round(o + rng.gauss(0, 2.0) * (3 if rng.random() < 0.12 else 1), 2)
+-        series.append(candle(k - 100, o, round(max(o, c) + abs(rng.gauss(0, 0.6)), 2),
+-                             round(min(o, c) - abs(rng.gauss(0, 0.6)), 2), c))
++        series.append(
++            candle(
++                k - 100,
++                o,
++                round(max(o, c) + abs(rng.gauss(0, 0.6)), 2),
++                round(min(o, c) - abs(rng.gauss(0, 0.6)), 2),
++                c,
++            )
++        )
+         price = c
+ 
+     def pipeline(cs):
+-        scfg, lcfg, dcfg, fcfg, ncfg = (StructureConfig.from_spec(), LiquidityConfig.from_spec(),
+-                                        DisplacementConfig.from_spec(), FvgConfig.from_spec(),
+-                                        NoWickConfig.from_spec())
++        scfg, lcfg, dcfg, fcfg, ncfg = (
++            StructureConfig.from_spec(),
++            LiquidityConfig.from_spec(),
++            DisplacementConfig.from_spec(),
++            FvgConfig.from_spec(),
++            NoWickConfig.from_spec(),
++        )
+         swings, sev, *_ = structure_analyze(cs, scfg)
+         pools, lev, _, _ = liquidity_analyze(cs, swings, lcfg)
+         sev = qualify_structure(sev, lev, pools, swings, cs, lcfg)
+@@ -129,15 +166,26 @@ def test_full_pipeline_no_wick_no_lookahead_prefix_property():
+         disp = detect(cs, dcfg, fvg_index(raw))
+         arrays, _ = run_fvgs(cs, raw, disp, sev, fcfg, "XAUUSD", Timeframe.M15)
+         sev = qualify_displacement(sev, disp, cs, dcfg)
+-        nw_events, *_ = no_wick_analyze(cs, ncfg, displacements=disp, pd_arrays=arrays, structure=sev,
+-                                        liquidity=lev, gap_after=set())
++        nw_events, *_ = no_wick_analyze(
++            cs, ncfg, displacements=disp, pd_arrays=arrays, structure=sev, liquidity=lev, gap_after=set()
++        )
+         nw_arrays = _no_wick_zone_arrays(nw_events, "XAUUSD", Timeframe.M15)
+         loose = replace(CFG, expire_at_trading_day_end=False)
+         return run_setups(
+-            Inputs(candles=cs, structure=sev, swings=swings, liquidity_events=lev, pools=pools,
+-                   pd_arrays=[*arrays, *nw_arrays], htf_events={"D1": sev, "H4": sev},
+-                   entry_model=EntryModel.NO_WICK_REBALANCE),
+-            loose, SCFG, SetupMode.AGGRESSIVE)[0]
++            Inputs(
++                candles=cs,
++                structure=sev,
++                swings=swings,
++                liquidity_events=lev,
++                pools=pools,
++                pd_arrays=[*arrays, *nw_arrays],
++                htf_events={"D1": sev, "H4": sev},
++                entry_model=EntryModel.NO_WICK_REBALANCE,
++            ),
++            loose,
++            SCFG,
++            SetupMode.AGGRESSIVE,
++        )[0]
+ 
+     full = pipeline(series)
+     for k in (150, 260, 419):
+diff --git a/services/api/tests/unit/test_silver_bullet.py b/services/api/tests/unit/test_silver_bullet.py
+new file mode 100644
+index 0000000..a2cd4bb
+--- /dev/null
++++ b/services/api/tests/unit/test_silver_bullet.py
+@@ -0,0 +1,282 @@
++"""Silver Bullet setup family: New York windows, causality, structural risk, and expiry."""
++
++from datetime import UTC, date, datetime, timedelta
++
++from app.domain.enums import (
++    DataQuality,
++    Direction,
++    DisplacementGrade,
++    LiquidityKind,
++    LiquiditySide,
++    LiquidityState,
++    PdArrayState,
++    PdArrayType,
++    StructureLevel,
++    SwingKind,
++    SwingLabel,
++    Timeframe,
++)
++from app.domain.models import Candle
++from app.services.displacement.engine import DisplacementEvent
++from app.services.fvg.engine import PdArray, QualityBreakdown
++from app.services.liquidity.models import LiquidityPool
++from app.services.silver_bullet.engine import SilverBulletInputs, run_silver_bullet
++from app.services.silver_bullet.models import SilverBulletConfig, SilverBulletState, SilverBulletWindow
++from app.services.structure.models import Swing
++
++BAR = timedelta(minutes=5)
++
++
++def at(hour: int, minute: int = 0, *, day: int = 5) -> datetime:
++    """March 5, 2024 is EST: New York = UTC - 5."""
++    return datetime(2024, 3, day, hour + 5, minute, tzinfo=UTC)
++
++
++def candle(t: datetime, o: float, h: float, lo: float, c: float) -> Candle:
++    return Candle(
++        symbol="XAUUSD",
++        timeframe=Timeframe.M5,
++        open_time=t,
++        close_time=t + BAR,
++        open=o,
++        high=h,
++        low=lo,
++        close=c,
++        volume=1.0,
++        source="test",
++        is_closed=True,
++        data_quality=DataQuality.CURRENT,
++    )
++
++
++def displacement(known: datetime, direction: Direction = Direction.BULLISH) -> DisplacementEvent:
++    return DisplacementEvent(
++        id="D-1",
++        run_id="D-RUN",
++        direction=direction,
++        grade=DisplacementGrade.STRONG,
++        start_time=known - 2 * BAR,
++        end_time=known - BAR,
++        known_at=known,
++        bars=2,
++        net_move=4.0 if direction is Direction.BULLISH else -4.0,
++        net_atr=2.0,
++        atr=2.0,
++        avg_body_pct=0.8,
++        created_fvg=True,
++        capped=False,
++        across_gap=False,
++        supersedes=None,
++        detail="",
++    )
++
++
++def fvg(known: datetime, direction: Direction = Direction.BULLISH) -> PdArray:
++    low, high = (2000.0, 2002.0)
++    return PdArray(
++        id="FVG-1",
++        symbol="XAUUSD",
++        timeframe=Timeframe.M5,
++        type=PdArrayType.FVG,
++        direction=direction,
++        high=high,
++        low=low,
++        midpoint=2001.0,
++        created_at=known - BAR,
++        known_at=known,
++        source_id=None,
++        size_atr=1.0,
++        state=PdArrayState.FRESH,
++        ifvg_status=None,
++        mitigation_pct=0.0,
++        touched_at=None,
++        invalidated_at=None,
++        bars_since_created=0,
++        freshness=1.0,
++        quality_score=70.0,
++        quality=QualityBreakdown(size=1.0, displacement=1.0, structure=0.0),
++        displacement_event_id="D-1",
++        structure_event_id=None,
++        timeframe_weight=1.0,
++        distance_atr=None,
++    )
++
++
++def swing(known: datetime, direction: Direction = Direction.BULLISH) -> Swing:
++    return Swing(
++        id="SWING-1",
++        level=StructureLevel.INTERNAL,
++        kind=SwingKind.LOW if direction is Direction.BULLISH else SwingKind.HIGH,
++        label=SwingLabel.HL if direction is Direction.BULLISH else SwingLabel.LH,
++        price=1998.0 if direction is Direction.BULLISH else 2004.0,
++        time=known - 4 * BAR,
++        known_at=known - BAR,
++        across_gap=False,
++    )
++
++
++def pool(known: datetime, direction: Direction = Direction.BULLISH) -> LiquidityPool:
++    return LiquidityPool(
++        id="TARGET-1",
++        kind=LiquidityKind.PDH if direction is Direction.BULLISH else LiquidityKind.PDL,
++        side=LiquiditySide.BSL if direction is Direction.BULLISH else LiquiditySide.SSL,
++        scope=StructureLevel.EXTERNAL,
++        price=2012.0 if direction is Direction.BULLISH else 1990.0,
++        label="target liquidity",
++        formed_at=known - timedelta(days=1),
++        known_at=known - BAR,
++        member_ids=[],
++        state=LiquidityState.FRESH,
++        state_since=None,
++        touched_at=None,
++        taken_at=None,
++        data_gap=False,
++        distance=None,
++        distance_atr=None,
++        magnet_score=80.0,
++        breakdown=None,
++    )
++
++
++def inputs(known: datetime, candles: list[Candle], **changes: object) -> SilverBulletInputs:
++    values: dict[str, object] = {
++        "candles": candles,
++        "pd_arrays": [fvg(known)],
++        "displacements": [displacement(known)],
++        "swings": [swing(known)],
++        "pools": [pool(known)],
++        "gap_after": set(),
++    }
++    values.update(changes)
++    return SilverBulletInputs(**values)  # type: ignore[arg-type]
++
++
++def test_config_has_three_dst_aware_new_york_windows() -> None:
++    cfg = SilverBulletConfig.from_spec()
++    assert cfg.timezone.key == "America/New_York"
++    assert [(w.name, w.start.isoformat(), w.end.isoformat()) for w in cfg.windows] == [
++        (SilverBulletWindow.LONDON, "03:00:00", "04:00:00"),
++        (SilverBulletWindow.NEW_YORK_AM, "10:00:00", "11:00:00"),
++        (SilverBulletWindow.NEW_YORK_PM, "14:00:00", "15:00:00"),
++    ]
++
++
++def test_window_bounds_follow_new_york_dst_not_fixed_utc() -> None:
++    cfg = SilverBulletConfig.from_spec()
++    london = cfg.windows[0]
++    winter, _ = london.bounds(date(2024, 3, 5), cfg.timezone)
++    summer, _ = london.bounds(date(2024, 3, 12), cfg.timezone)
++    assert winter.hour == 8 and summer.hour == 7
++
++
++def test_forms_and_fills_only_after_fvg_is_known_inside_window() -> None:
++    known = at(3, 20)
++    candles = [
++        candle(at(3, 15), 1999, 2003, 1999, 2003),
++        candle(at(3, 20), 2003, 2004, 2002.5, 2003.5),
++        candle(at(3, 25), 2003.5, 2004, 2001.5, 2003),
++    ]
++    result = run_silver_bullet(inputs(known, candles), SilverBulletConfig.from_spec())
++    assert len(result) == 1
++    setup = result[0]
++    assert setup.window is SilverBulletWindow.LONDON
++    assert setup.state is SilverBulletState.FILLED
++    assert setup.formed_at == known and setup.filled_at == at(3, 30)
++    assert setup.entry == 2002.0
++    assert setup.stop == 1997.8
++    assert setup.target == 2012.0
++    assert setup.risk_reward == 2.38
++
++
++def test_fvg_known_before_or_at_window_end_is_not_a_candidate() -> None:
++    cfg = SilverBulletConfig.from_spec()
++    for known in (at(2, 55), at(4, 0)):
++        candles = [candle(known, 2000, 2004, 1999, 2003)]
++        assert run_silver_bullet(inputs(known, candles), cfg) == []
++
++
++def test_requires_matching_causal_displacement() -> None:
++    known = at(10, 20)
++    bad = displacement(known + BAR)
++    candles = [candle(at(10, 20), 2003, 2004, 2002.5, 2003.5)]
++    result = run_silver_bullet(inputs(known, candles, displacements=[bad]), SilverBulletConfig.from_spec())
++    assert result[0].state is SilverBulletState.BLOCKED
++    assert result[0].blockers == ["NO_CAUSAL_DISPLACEMENT"]
++
++
++def test_requires_structural_invalidation_and_liquidity_target() -> None:
++    known = at(14, 20)
++    candles = [candle(at(14, 20), 2003, 2004, 2002.5, 2003.5)]
++    no_swing = run_silver_bullet(inputs(known, candles, swings=[]), SilverBulletConfig.from_spec())
++    no_target = run_silver_bullet(inputs(known, candles, pools=[]), SilverBulletConfig.from_spec())
++    assert no_swing[0].blockers == ["NO_STRUCTURAL_INVALIDATION"]
++    assert no_target[0].blockers == ["NO_LIQUIDITY_TARGET"]
++
++
++def test_blocks_subminimum_risk_reward_instead_of_forcing_a_trade() -> None:
++    known = at(10, 20)
++    close_target = pool(known).model_copy(update={"price": 2005.0})
++    candles = [candle(at(10, 20), 2003, 2004, 2002.5, 2003.5)]
++    result = run_silver_bullet(inputs(known, candles, pools=[close_target]), SilverBulletConfig.from_spec())
++    assert result[0].state is SilverBulletState.BLOCKED
++    assert result[0].blockers == ["RISK_REWARD_BELOW_MINIMUM"]
++
++
++def test_unfilled_setup_expires_at_window_end() -> None:
++    known = at(3, 20)
++    candles = [
++        candle(at(3, 20), 2003, 2004, 2002.5, 2003.5),
++        candle(at(3, 55), 2005, 2006, 2004, 2005),
++        candle(at(4, 0), 2005, 2006, 2004, 2005),
++    ]
++    result = run_silver_bullet(inputs(known, candles), SilverBulletConfig.from_spec())
++    assert result[0].state is SilverBulletState.EXPIRED
++    assert result[0].filled_at is None
++
++
++def test_gap_before_fill_blocks_candidate() -> None:
++    known = at(3, 20)
++    touch = candle(at(3, 25), 2003.5, 2004, 2001.5, 2003)
++    result = run_silver_bullet(
++        inputs(known, [candle(at(3, 20), 2003, 2004, 2002.5, 2003.5), touch], gap_after={touch.open_time}),
++        SilverBulletConfig.from_spec(),
++    )
++    assert result[0].state is SilverBulletState.BLOCKED
++    assert result[0].blockers == ["DATA_GAP_BEFORE_ENTRY"]
++
++
++def test_target_reached_before_retracement_marks_entry_missed() -> None:
++    known = at(3, 20)
++    candles = [
++        candle(at(3, 20), 2003, 2004, 2002.5, 2003.5),
++        candle(at(3, 25), 2004, 2012.5, 2003, 2011),
++    ]
++    result = run_silver_bullet(inputs(known, candles), SilverBulletConfig.from_spec())
++    assert result[0].state is SilverBulletState.ENTRY_MISSED
++    assert result[0].filled_at is None
++
++
++def test_same_candle_entry_and_target_is_blocked_as_intrabar_ambiguous() -> None:
++    known = at(3, 20)
++    candles = [
++        candle(at(3, 20), 2003, 2004, 2002.5, 2003.5),
++        candle(at(3, 25), 2003.5, 2012.5, 2001.5, 2010),
++    ]
++    result = run_silver_bullet(inputs(known, candles), SilverBulletConfig.from_spec())
++    assert result[0].state is SilverBulletState.BLOCKED
++    assert result[0].blockers == ["INTRABAR_ENTRY_TARGET_AMBIGUITY"]
++
++
++def test_unfilled_setup_with_gap_is_blocked_not_expired() -> None:
++    known = at(3, 20)
++    after_gap = candle(at(3, 55), 2005, 2006, 2004, 2005)
++    candles = [
++        candle(at(3, 20), 2003, 2004, 2002.5, 2003.5),
++        after_gap,
++        candle(at(4, 0), 2005, 2006, 2004, 2005),
++    ]
++    result = run_silver_bullet(
++        inputs(known, candles, gap_after={after_gap.open_time}), SilverBulletConfig.from_spec()
++    )
++    assert result[0].state is SilverBulletState.BLOCKED
++    assert result[0].blockers == ["DATA_GAP_BEFORE_ENTRY"]
+-- 
+2.47.3
+

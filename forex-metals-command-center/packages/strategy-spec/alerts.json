@@ -1,0 +1,153 @@
+{
+  "$comment": "Phase 11 alerts V1 (spec STEP 9). Alerts describe meaningful state changes of the deterministic engines; they are never trade instructions. ALERT_ME_WHEN_READY fires only on a LONG/SHORT verdict under FULL authority. Any change must bump strategyVersion.",
+  "monitoredSymbols": [
+    "XAUUSD"
+  ],
+  "maxMonitoredSymbols": 3,
+  "maxReadyWatches": 10,
+  "pollSeconds": 30,
+  "maxQuietSeconds": 300,
+  "bufferSize": 500,
+  "noveltyGraceBars": 1,
+  "minDisplacementGrade": "STRONG",
+  "minNoWickStrength": "STRONG",
+  "categoryCooldownSeconds": {
+    "INFORMATIONAL": 900,
+    "WATCH": 900,
+    "SETUP": 300,
+    "ENTRY": 300,
+    "RISK": 900,
+    "MANAGEMENT": 300,
+    "CRITICAL": 600
+  },
+  "types": {
+    "LIQUIDITY_APPROACHING": {
+      "category": "WATCH",
+      "priority": "LOW"
+    },
+    "LIQUIDITY_SWEEP": {
+      "category": "WATCH",
+      "priority": "MEDIUM"
+    },
+    "LIQUIDITY_RUN": {
+      "category": "WATCH",
+      "priority": "MEDIUM"
+    },
+    "EQUAL_LEVEL_CREATED": {
+      "category": "WATCH",
+      "priority": "LOW"
+    },
+    "KEY_LEVEL_INTERACTION": {
+      "category": "WATCH",
+      "priority": "MEDIUM"
+    },
+    "SESSION_LIQUIDITY_EVENT": {
+      "category": "WATCH",
+      "priority": "MEDIUM"
+    },
+    "STRUCTURE_BREAK": {
+      "category": "SETUP",
+      "priority": "MEDIUM"
+    },
+    "DISPLACEMENT": {
+      "category": "WATCH",
+      "priority": "MEDIUM"
+    },
+    "NO_WICK_EVENT": {
+      "category": "WATCH",
+      "priority": "LOW"
+    },
+    "NO_WICK_REBALANCE": {
+      "category": "WATCH",
+      "priority": "LOW"
+    },
+    "FVG_CREATED": {
+      "category": "INFORMATIONAL",
+      "priority": "LOW"
+    },
+    "FVG_TOUCHED": {
+      "category": "WATCH",
+      "priority": "LOW"
+    },
+    "FVG_INVALIDATED": {
+      "category": "INFORMATIONAL",
+      "priority": "LOW"
+    },
+    "SETUP_ARMED": {
+      "category": "SETUP",
+      "priority": "MEDIUM"
+    },
+    "ENTRY_ZONE_APPROACHING": {
+      "category": "ENTRY",
+      "priority": "MEDIUM"
+    },
+    "ENTRY_ZONE_TOUCHED": {
+      "category": "ENTRY",
+      "priority": "HIGH"
+    },
+    "ENTRY_CONFIRMED_PENDING_GATES": {
+      "category": "ENTRY",
+      "priority": "HIGH"
+    },
+    "ENTRY_MISSED": {
+      "category": "ENTRY",
+      "priority": "MEDIUM"
+    },
+    "EARLY_ENTRY_WARNING": {
+      "category": "ENTRY",
+      "priority": "MEDIUM"
+    },
+    "SETUP_INVALIDATED": {
+      "category": "SETUP",
+      "priority": "MEDIUM"
+    },
+    "SETUP_EXPIRED": {
+      "category": "SETUP",
+      "priority": "LOW"
+    },
+    "SESSION_CHANGE": {
+      "category": "INFORMATIONAL",
+      "priority": "LOW"
+    },
+    "RISK_LOCK": {
+      "category": "RISK",
+      "priority": "HIGH"
+    },
+    "RISK_LOCK_CLEARED": {
+      "category": "RISK",
+      "priority": "LOW"
+    },
+    "DATA_UNAVAILABLE": {
+      "category": "CRITICAL",
+      "priority": "CRITICAL"
+    },
+    "DATA_RESTORED": {
+      "category": "INFORMATIONAL",
+      "priority": "MEDIUM"
+    },
+    "MONITOR_FAILURE": {
+      "category": "CRITICAL",
+      "priority": "CRITICAL"
+    },
+    "READY": {
+      "category": "ENTRY",
+      "priority": "CRITICAL"
+    },
+    "NEWS_COUNTDOWN": {
+      "category": "RISK",
+      "priority": "MEDIUM"
+    },
+    "NEWS_BLACKOUT": {
+      "category": "RISK",
+      "priority": "HIGH"
+    },
+    "NEWS_CLEARED": {
+      "category": "INFORMATIONAL",
+      "priority": "LOW"
+    },
+    "MACRO_SHIFT": {
+      "category": "WATCH",
+      "priority": "MEDIUM"
+    }
+  }
+}

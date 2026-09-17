@@ -1,0 +1,17 @@
+{
+  "name": "fmcc",
+  "private": true,
+  "description": "Forex & Metals ICT/SMC Trading Command Center (broker-free decision support)",
+  "workspaces": [
+    "apps/web",
+    "packages/shared-types"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$comment": "Phase 14 basic macro (spec STEP 7). Macro modifies score, confidence (via conflict) and narrative; it never replaces technical structure and never blocks. relationship +1 = the series rising supports the market rising. surprise.lookbackHours cannot exceed news.json listBeforeHours (the news assessment lists no older events). Research defaults, not calibrated. Any change must bump strategyVersion.",
+  "lookbackObservations": 5,
+  "volatilityObservations": 20,
+  "minObservations": 25,
+  "flatZ": 0.5,
+  "maxAgeDays": 4,
+  "requiredSeries": ["DXY"],
+  "thresholds": { "stronglySupportive": 0.6, "supportive": 0.2 },
+  "correlation": { "series": "DXY", "observations": 20, "minAbs": 0.2, "invertedWeightFactor": 0.5 },
+  "surprise": {
+    "weight": 1,
+    "lookbackHours": 6,
+    "minImportance": "HIGH",
+    "usdPositiveKeywords": ["cpi", "inflation", "pce", "ppi", "payroll", "nfp", "retail sales", "gdp", "ism", "pmi", "average hourly earnings"],
+    "usdNegativeKeywords": ["unemployment rate", "jobless claims", "initial claims"]
+  },
+  "drivers": {
+    "XAUUSD": [
+      { "series": "DXY", "relationship": -1, "weight": 3 },
+      { "series": "US10Y_REAL", "relationship": -1, "weight": 3, "fallback": "US10Y" },
+      { "series": "US2Y", "relationship": -1, "weight": 1 },
+      { "series": "VIX", "relationship": 1, "weight": 1 }
+    ],
+    "XAGUSD": [
+      { "series": "DXY", "relationship": -1, "weight": 3 },
+      { "series": "US10Y_REAL", "relationship": -1, "weight": 2, "fallback": "US10Y" },
+      { "series": "US2Y", "relationship": -1, "weight": 1 }
+    ],
+    "EURUSD": [{ "series": "DXY", "relationship": -1, "weight": 3 }, { "series": "US2Y", "relationship": -1, "weight": 2 }],
+    "GBPUSD": [{ "series": "DXY", "relationship": -1, "weight": 3 }, { "series": "US2Y", "relationship": -1, "weight": 2 }],
+    "AUDUSD": [{ "series": "DXY", "relationship": -1, "weight": 3 }, { "series": "US2Y", "relationship": -1, "weight": 1 }, { "series": "VIX", "relationship": -1, "weight": 1 }],
+    "NZDUSD": [{ "series": "DXY", "relationship": -1, "weight": 3 }, { "series": "US2Y", "relationship": -1, "weight": 1 }, { "series": "VIX", "relationship": -1, "weight": 1 }],
+    "USDJPY": [{ "series": "DXY", "relationship": 1, "weight": 3 }, { "series": "US10Y", "relationship": 1, "weight": 2 }, { "series": "VIX", "relationship": -1, "weight": 1 }],
+    "USDCHF": [{ "series": "DXY", "relationship": 1, "weight": 3 }, { "series": "US2Y", "relationship": 1, "weight": 2 }],
+    "USDCAD": [{ "series": "DXY", "relationship": 1, "weight": 3 }, { "series": "US2Y", "relationship": 1, "weight": 2 }]
+  }
+}
