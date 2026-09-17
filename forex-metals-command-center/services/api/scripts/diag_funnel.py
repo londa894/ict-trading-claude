@@ -110,9 +110,13 @@ def _hint(code: TerminalReason) -> str:
             "Setups are being killed at the trading-day boundary. Check expireAtTradingDayEnd "
             "and whether the retracement/confirmation windows can even fit inside one session."
         ),
-        TerminalReason.EXPIRED_NO_MSS: (
-            "Sweeps happen but no qualifying market-structure shift follows within the window. "
-            "Check mss_window_bars and the displacement qualifier."
+        TerminalReason.EXPIRED_NO_BREAK: (
+            "Sweeps happen but structure never breaks in the same direction within the window. "
+            "The binding gate is mss.windowBars (timing), not the displacement qualifier."
+        ),
+        TerminalReason.EXPIRED_MSS_NO_DISPLACEMENT: (
+            "Structure DOES break but the displacement qualifier rejects it. The binding gate is "
+            "mss.requireDisplacement / the displacement threshold, not the window length."
         ),
         TerminalReason.EXPIRED_NO_FVG: (
             "MSS occurs but the displacement leg leaves no acceptable FVG. Check the minimum "

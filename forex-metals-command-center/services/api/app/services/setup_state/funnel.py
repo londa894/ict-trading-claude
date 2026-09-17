@@ -22,7 +22,8 @@ class TerminalReason(StrEnum):
 
     # Ran out of time or structure at a specific stage
     EXPIRED_TRADING_DAY = "EXPIRED_TRADING_DAY"
-    EXPIRED_NO_MSS = "EXPIRED_NO_MSS"
+    EXPIRED_NO_BREAK = "EXPIRED_NO_BREAK"
+    EXPIRED_MSS_NO_DISPLACEMENT = "EXPIRED_MSS_NO_DISPLACEMENT"
     EXPIRED_NO_FVG = "EXPIRED_NO_FVG"
     EXPIRED_NO_RETRACEMENT = "EXPIRED_NO_RETRACEMENT"
     EXPIRED_NO_CONFIRMATION = "EXPIRED_NO_CONFIRMATION"
@@ -45,7 +46,8 @@ class TerminalReason(StrEnum):
 # Ordered: first matching fragment wins, so more specific phrases come first.
 _EXPIRED_PATTERNS: tuple[tuple[str, TerminalReason], ...] = (
     ("trading day ended", TerminalReason.EXPIRED_TRADING_DAY),
-    ("no confirmation break", TerminalReason.EXPIRED_NO_MSS),
+    ("lacked displacement", TerminalReason.EXPIRED_MSS_NO_DISPLACEMENT),  # must precede the generic
+    ("no confirmation break", TerminalReason.EXPIRED_NO_BREAK),
     ("no fvg formed", TerminalReason.EXPIRED_NO_FVG),
     ("no entry confirmation", TerminalReason.EXPIRED_NO_CONFIRMATION),
     ("no retracement", TerminalReason.EXPIRED_NO_RETRACEMENT),

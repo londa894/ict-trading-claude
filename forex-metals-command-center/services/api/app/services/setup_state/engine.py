@@ -150,6 +150,7 @@ class _Setup:
     plan: EntryPlan | None = None
     retest_index: int = -1
     retest_close: float = 0.0
+    breaks_without_displacement: int = 0  # diagnostic: same-direction breaks the qualifier rejected
 
     @property
     def bullish(self) -> bool:
@@ -397,7 +398,11 @@ class _Machine:
             self.collect_zones(s, i)
             return
         if i - s.liquidity_index >= self.cfg.mss_window_bars:
-            self.end(s, S.EXPIRED, i, f"no confirmation break within {self.cfg.mss_window_bars} bars")
+            detail = f"no confirmation break within {self.cfg.mss_window_bars} bars"
+            if s.breaks_without_displacement:
+                # Names the binding gate: structure broke, the displacement qualifier refused it.
+                detail += f" ({s.breaks_without_displacement} break(s) lacked displacement)"
+            self.end(s, S.EXPIRED, i, detail)
         elif not same_candle and s.state is S.LIQUIDITY_EVENT:
             self.emit(s, S.WAITING_FOR_MSS, i, "waiting for a displacement MSS/CHoCH")
 
@@ -406,6 +411,9 @@ class _Machine:
             if e.direction is not s.direction:
                 continue
             if self.cfg.mss_require_displacement and e.displacement_qualifier is not QualifierStatus.PRESENT:
+                # Diagnostic only: remember that structure DID break but failed the
+                # displacement qualifier, so the expiry reason can name the binding gate.
+                s.breaks_without_displacement += 1
                 continue
             return e
         return None

@@ -48,7 +48,7 @@ def setup(state: SetupState, reason: str | None, *, sid: str = "s1", terminal: b
         (
             SetupState.EXPIRED,
             "no confirmation break within 12 bars",
-            TerminalReason.EXPIRED_NO_MSS,
+            TerminalReason.EXPIRED_NO_BREAK,
         ),
         (
             SetupState.EXPIRED,
