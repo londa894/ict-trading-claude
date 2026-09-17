@@ -29,10 +29,19 @@ from app.services.data_quality.market_hours import market_status_at
 
 logger = logging.getLogger("fmcc.tradelocker")
 
-# TradeLocker timeframe IDs (resolution in seconds)
-_TF_TO_RESOLUTION: dict[Timeframe, int] = {
+# TradeLocker resolution tokens, with each bucket's duration for windowing.
+_TF_TO_RESOLUTION: dict[Timeframe, str] = {
+    Timeframe.M1: "1m",
+    Timeframe.M5: "5m",
+    Timeframe.M15: "15m",
+    Timeframe.M30: "30m",
+    Timeframe.H1: "1h",
+    Timeframe.H4: "4h",
+    Timeframe.D1: "1D",
+}
+
+_TF_SECONDS: dict[Timeframe, int] = {
     Timeframe.M1: 60,
-    Timeframe.M3: 180,
     Timeframe.M5: 300,
     Timeframe.M15: 900,
     Timeframe.M30: 1800,
@@ -75,6 +84,7 @@ class TradeLockerProvider:
         self._account_id: str | None = None
         self._acc_num: str | None = None
         self._route_id: str | None = None
+        self._instrument_cache: dict[str, tuple[int, int]] = {}
         self._lock = asyncio.Lock()
         self._client = httpx.AsyncClient(timeout=_REQUEST_TIMEOUT)
 
@@ -148,29 +158,61 @@ class TradeLockerProvider:
         accounts = resp.json().get("accounts", [])
         if not accounts:
             raise ProviderUnavailableError("No TradeLocker accounts found")
-        # Pick first account
         acc = accounts[0]
         self._account_id = str(acc.get("id", ""))
         self._acc_num = str(acc.get("accNum", ""))
+        self._instrument_cache.clear()  # ids are account-scoped
+        if not self._account_id or not self._acc_num:
+            raise ProviderUnavailableError("TradeLocker account is missing id or accNum")
         logger.info("TradeLocker: using account %s (accNum=%s)", self._account_id, self._acc_num)
 
     # ------------------------------------------------------------------
     # Symbol resolution
     # ------------------------------------------------------------------
 
-    async def _route_instrument_id(self, symbol: str, token: str) -> int:
-        """Look up the routeInstrumentId for a symbol."""
+    async def _instrument_route(self, symbol: str, token: str) -> tuple[int, int]:
+        """Return (tradableInstrumentId, infoRouteId), cached per symbol.
+
+        Instruments are account-scoped on TradeLocker. Each instrument carries routes;
+        market data uses the INFO route, which is distinct from the TRADE route.
+        """
+        key = symbol.upper()
+        cached = self._instrument_cache.get(key)
+        if cached is not None:
+            return cached
+        if not self._account_id:
+            raise ProviderUnavailableError("TradeLocker account not resolved")
         resp = await self._client.get(
-            f"{self._base}/trade/instruments",
+            f"{self._base}/trade/accounts/{self._account_id}/instruments",
             headers=self._headers(token),
             params={"locale": "en"},
         )
         resp.raise_for_status()
-        tl_symbol = _SYMBOL_MAP.get(symbol.upper(), symbol.upper())
-        for inst in resp.json().get("d", {}).get("instruments", []):
-            if inst.get("name", "").upper() == tl_symbol:
-                return int(inst["routeId"])
-        raise UnsupportedSymbolError(f"{symbol} not found on TradeLocker account")
+        payload = resp.json().get("d", {})
+        instruments = payload.get("instruments", payload if isinstance(payload, list) else [])
+        tl_symbol = _SYMBOL_MAP.get(key, key)
+        for inst in instruments:
+            name = str(inst.get("name", "")).upper()
+            if name != tl_symbol:
+                continue
+            tradable_id = int(inst.get("tradableInstrumentId", inst.get("id", 0)))
+            routes = inst.get("routes", [])
+            info_route = next(
+                (r for r in routes if str(r.get("type", "")).upper() == "INFO"),
+                routes[0] if routes else None,
+            )
+            if info_route is None or not tradable_id:
+                raise ProviderError(f"{symbol}: TradeLocker returned no usable route")
+            resolved = (tradable_id, int(info_route["id"]))
+            self._instrument_cache[key] = resolved
+            logger.info(
+                "TradeLocker: %s -> tradableInstrumentId=%s routeId=%s", key, resolved[0], resolved[1]
+            )
+            return resolved
+        available = sorted({str(i.get("name", "")) for i in instruments})[:15]
+        raise UnsupportedSymbolError(
+            f"{symbol} not offered on this TradeLocker account; sample of available: {available}"
+        )
 
     # ------------------------------------------------------------------
     # MarketDataProvider interface
@@ -181,16 +223,16 @@ class TradeLockerProvider:
         if instrument is None:
             raise UnsupportedSymbolError(symbol)
         token = await self._ensure_token()
-        route_id = await self._route_instrument_id(symbol, token)
+        tradable_id, route_id = await self._instrument_route(symbol, token)
         resp = await self._client.get(
             f"{self._base}/trade/quotes",
             headers=self._headers(token),
-            params={"routeInstrumentId": route_id},
+            params={"routeId": route_id, "tradableInstrumentId": tradable_id},
         )
         resp.raise_for_status()
         data = resp.json().get("d", {})
-        bid = float(data.get("bid", 0))
-        ask = float(data.get("ask", 0))
+        bid = float(data.get("bp", data.get("bid", 0)) or 0)
+        ask = float(data.get("ap", data.get("ask", 0)) or 0)
         if bid <= 0 or ask <= 0:
             raise ProviderError(f"Invalid quote for {symbol}: bid={bid} ask={ask}")
         return Quote(
@@ -214,16 +256,18 @@ class TradeLockerProvider:
         if instrument is None:
             raise UnsupportedSymbolError(symbol)
         resolution = _TF_TO_RESOLUTION.get(timeframe)
-        if resolution is None:
+        bucket_seconds = _TF_SECONDS.get(timeframe)
+        if resolution is None or bucket_seconds is None:
             raise ProviderError(f"Timeframe {timeframe} not supported by TradeLocker provider")
         token = await self._ensure_token()
-        route_id = await self._route_instrument_id(symbol, token)
+        tradable_id, route_id = await self._instrument_route(symbol, token)
         now = datetime.now(UTC)
         end_ts = int((end or now).timestamp()) * 1000
         if start is not None:
             start_ts = int(start.timestamp()) * 1000
         elif limit is not None:
-            start_ts = int((now - timedelta(seconds=resolution * limit * 2)).timestamp()) * 1000
+            # Request extra span so weekends and market closures still yield `limit` bars.
+            start_ts = int((now - timedelta(seconds=bucket_seconds * limit * 3)).timestamp()) * 1000
         else:
             raise ProviderError("Either start or limit is required")
 
@@ -231,25 +275,20 @@ class TradeLockerProvider:
             f"{self._base}/trade/history",
             headers=self._headers(token),
             params={
-                "routeInstrumentId": route_id,
+                "routeId": route_id,
+                "tradableInstrumentId": tradable_id,
                 "resolution": resolution,
                 "from": start_ts,
                 "to": end_ts,
-                "countBack": limit or 5000,
             },
         )
         resp.raise_for_status()
-        raw: dict[str, Any] = resp.json().get("d", {})
-        times = raw.get("t", [])
-        opens = raw.get("o", [])
-        highs = raw.get("h", [])
-        lows = raw.get("l", [])
-        closes = raw.get("c", [])
-        volumes = raw.get("v", [])
+        payload: dict[str, Any] = resp.json().get("d", {})
+        bar_details = payload.get("barDetails", [])
 
         bars: list[RawBar] = []
-        for i, ts in enumerate(times):
-            open_time = datetime.fromtimestamp(ts / 1000, tz=UTC)
+        for entry in bar_details:
+            open_time = datetime.fromtimestamp(int(entry["t"]) / 1000, tz=UTC)
             if start is not None and open_time < start:
                 continue
             if end is not None and open_time >= end:
@@ -259,11 +298,11 @@ class TradeLockerProvider:
                     symbol=instrument.symbol,
                     timeframe=timeframe,
                     open_time=open_time,
-                    open=float(opens[i]),
-                    high=float(highs[i]),
-                    low=float(lows[i]),
-                    close=float(closes[i]),
-                    volume=float(volumes[i]) if volumes else None,
+                    open=float(entry["o"]),
+                    high=float(entry["h"]),
+                    low=float(entry["l"]),
+                    close=float(entry["c"]),
+                    volume=float(entry["v"]) if entry.get("v") is not None else None,
                 )
             )
         bars.sort(key=lambda b: b.open_time)
@@ -326,7 +365,7 @@ class TradeLockerProvider:
                 is_synthetic=False,
                 message=f"TradeLocker live (LivvFX) — XAUUSD bid={quote.bid} ask={quote.ask}",
             )
-        except ProviderUnavailableError as exc:
+        except ProviderError as exc:
             return ProviderHealth(
                 provider=self.name,
                 status=ProviderHealthStatus.DOWN,
@@ -336,10 +375,13 @@ class TradeLockerProvider:
             )
         except Exception as exc:
             logger.exception("TradeLocker health check failed")
+            detail = ""
+            if isinstance(exc, httpx.HTTPStatusError):
+                detail = f" ({exc.response.status_code} on {exc.request.url.path})"
             return ProviderHealth(
                 provider=self.name,
                 status=ProviderHealthStatus.DOWN,
                 checked_at=now,
                 is_synthetic=False,
-                message=f"unexpected error: {type(exc).__name__}",
+                message=f"unexpected error: {type(exc).__name__}{detail}",
             )
