@@ -53,11 +53,30 @@ class ProviderRegistry:
         return provider
 
 
-def default_registry() -> ProviderRegistry:
+def default_registry(
+    tradelocker_server: str = "",
+    tradelocker_email: str = "",
+    tradelocker_password: str = "",
+    tradelocker_account_server: str = "",
+) -> ProviderRegistry:
     from app.providers.fixture import SyntheticFixtureProvider
     from app.providers.unconfigured import UnconfiguredProvider
 
     registry = ProviderRegistry()
     registry.register(UnconfiguredProvider.name, UnconfiguredProvider)
     registry.register(SyntheticFixtureProvider.name, SyntheticFixtureProvider)
+
+    if tradelocker_server and tradelocker_email and tradelocker_password:
+        from app.providers.tradelocker import TradeLockerProvider
+
+        registry.register(
+            TradeLockerProvider.name,
+            lambda: TradeLockerProvider(
+                base_url=f"{tradelocker_server}/backend-api",
+                email=tradelocker_email,
+                password=tradelocker_password,
+                server=tradelocker_account_server,
+            ),
+        )
+
     return registry

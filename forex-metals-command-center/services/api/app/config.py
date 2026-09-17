@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     market_data_provider: str = "unconfigured"
     market_data_api_key: SecretStr | None = None
+    # TradeLocker live data provider credentials (LivvFX / bsa.tradelocker.com).
+    tradelocker_server: str = ""          # e.g. https://bsa.tradelocker.com
+    tradelocker_email: SecretStr | None = None
+    tradelocker_password: SecretStr | None = None
+    tradelocker_account_server: str = ""  # e.g. LIVVFX
     execution_timeframe: Timeframe = Timeframe.M5
     cors_origins: str = "http://localhost:3000"
     # Manual account profile (balance, limits, day state, user contract specs). Server-side, never committed.
