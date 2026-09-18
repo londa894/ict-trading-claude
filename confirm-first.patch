@@ -1,0 +1,175 @@
+From c385e1b625fa27c17f42580e813f7708f703b998 Mon Sep 17 00:00:00 2001
+From: Londa <londa@fmcc>
+Date: Fri, 18 Sep 2026 19:07:28 +0000
+Subject: [PATCH] feat: confirmBeforeChaseGuard - let an already-touched setup
+ confirm first (default OFF)
+
+Frequency diagnosis: 70% of armed setups die 'target reached before a confirmed entry',
+100% after touching the zone. For a setup that touched the FVG on a PRIOR candle, attempt
+confirm() BEFORE the chase guard: if an entry model fires on the target-take candle, the
+entry existed and should not lose the same-candle race. Touch-this-candle stays behind the
+guard (intrabar-ambiguous, fail safe). Default OFF; suite 1174 -> 1178.
+
+HONEST RESULT on the requested window (2022-03-07..21):
+  before fix: 0 closed trades
+  after fix:  0 closed trades (unchanged)
+
+diag_chase_split with the flag on shows why: 11 setups still die do-not-chase, all
+after-touch, none recovered. On the target-take candle NO entry model confirms, so
+confirm() returns False and the guard correctly still fires. The fix only helps when a
+confirmation is actually AVAILABLE on that candle (e.g. some summer-2024 cases); here it
+is not.
+
+So this window's bottleneck is deeper than guard ordering: price reaches the FVG but
+never produces a valid M15_CLOSE/LTF/no-wick entry before running to target. That is
+entry-model sensitivity, not the timing race. The fix is correct and safe but does not
+unblock every window. Next: measure how often a confirmation is available at all in the
+touch->target window, and whether entry-model/confirmationWindowBars need adjustment.
+
+No behaviour change (default OFF); spec restored byte-for-byte.
+---
+ .../api/app/services/setup_state/engine.py    | 10 +++
+ .../api/app/services/setup_state/models.py    |  2 +
+ .../services/api/scripts/batch_backtest.py    |  6 +-
+ .../api/tests/unit/test_confirm_first.py      | 71 +++++++++++++++++++
+ 4 files changed, 88 insertions(+), 1 deletion(-)
+ create mode 100644 forex-metals-command-center/services/api/tests/unit/test_confirm_first.py
+
+diff --git a/forex-metals-command-center/services/api/app/services/setup_state/engine.py b/forex-metals-command-center/services/api/app/services/setup_state/engine.py
+index 20f4a1a..59c616a 100644
+--- a/forex-metals-command-center/services/api/app/services/setup_state/engine.py
++++ b/forex-metals-command-center/services/api/app/services/setup_state/engine.py
+@@ -450,6 +450,16 @@ class _Machine:
+         if (c.close < s.protective) if s.bullish else (c.close > s.protective):
+             self.end(s, S.INVALIDATED, i, "closed beyond the protective extreme")
+             return
++        # An already-touched setup (touch on a PRIOR candle) has had its retracement; if an
++        # entry model confirms on this candle, the entry existed and must not lose to a
++        # same-candle target take. Attempt it before the chase guard. Default OFF.
++        if (
++            self.cfg.confirm_before_chase_guard
++            and s.state in (S.ENTRY_ZONE_TOUCHED, S.WAITING_FOR_CONFIRMATION)
++            and i > s.touched_index
++            and self.confirm(s, i)
++        ):
++            return
+         if chase_guard_applies(
+             target_taken=self.taken_index.get(s.target.pool_id, self.n) <= i,
+             zone_touched=s.touched_index >= 0,
+diff --git a/forex-metals-command-center/services/api/app/services/setup_state/models.py b/forex-metals-command-center/services/api/app/services/setup_state/models.py
+index cb2944c..f779ef3 100644
+--- a/forex-metals-command-center/services/api/app/services/setup_state/models.py
++++ b/forex-metals-command-center/services/api/app/services/setup_state/models.py
+@@ -36,6 +36,7 @@ class SetupConfig:
+     sweep_event_types: frozenset[LiquidityEventType]
+     significant_sweeps_only: bool
+     chase_guard_after_touch_only: bool
++    confirm_before_chase_guard: bool
+     min_target_atr: float
+     mss_break_types: frozenset[StructureEventType]
+     mss_require_displacement: bool
+@@ -64,6 +65,7 @@ class SetupConfig:
+             sweep_event_types=frozenset(LiquidityEventType(x) for x in s["sweepEventTypes"]),
+             significant_sweeps_only=bool(s.get("significantSweepsOnly", False)),
+             chase_guard_after_touch_only=bool(s.get("chaseGuardAfterTouchOnly", False)),
++            confirm_before_chase_guard=bool(s.get("confirmBeforeChaseGuard", False)),
+             min_target_atr=float(s.get("minTargetAtr", 0.0)),
+             mss_break_types=breaks,
+             mss_require_displacement=bool(mss["requireDisplacement"]),
+diff --git a/forex-metals-command-center/services/api/scripts/batch_backtest.py b/forex-metals-command-center/services/api/scripts/batch_backtest.py
+index b0a7964..ce6a841 100644
+--- a/forex-metals-command-center/services/api/scripts/batch_backtest.py
++++ b/forex-metals-command-center/services/api/scripts/batch_backtest.py
+@@ -144,7 +144,11 @@ async def main() -> None:
+ 
+     original = SPEC.read_text(encoding="utf-8")
+     base = json.loads(original)
+-    pinned = {"chaseGuardAfterTouchOnly": True, "minTargetAtr": args.min_target_atr}
++    pinned = {
++        "chaseGuardAfterTouchOnly": True,
++        "confirmBeforeChaseGuard": True,
++        "minTargetAtr": args.min_target_atr,
++    }
+     settings = get_settings()
+ 
+     windows = 0
+diff --git a/forex-metals-command-center/services/api/tests/unit/test_confirm_first.py b/forex-metals-command-center/services/api/tests/unit/test_confirm_first.py
+new file mode 100644
+index 0000000..eec7d3e
+--- /dev/null
++++ b/forex-metals-command-center/services/api/tests/unit/test_confirm_first.py
+@@ -0,0 +1,71 @@
++"""confirmFirst: an entry available the same candle the target is taken should win.
++
++Frequency diagnosis (2026-09-18): 70% of armed setups die "target reached before a
++confirmed entry", and 100% of those had TOUCHED the entry zone first. The setup reaches
++its FVG, then during the confirmation wait price runs to target on some candle; the
++chase guard (which runs before confirm()) kills it even when an entry model would have
++confirmed on that very candle.
++
++`confirmBeforeChaseGuard` lets an ALREADY-TOUCHED setup attempt confirmation before the
++chase guard fires. A setup that touched the zone on a PRIOR candle has genuinely had its
++retracement; if a model confirms this candle, the entry existed and should not lose to
++the same-candle target take. Default OFF so the shipped strategy is unchanged. The
++touch-this-candle path stays behind the guard (intrabar-ambiguous, fail safe).
++"""
++
++from __future__ import annotations
++
++import dataclasses
++
++from app.domain.enums import EntryModel, SetupState
++from app.services.setup_state.models import SetupConfig
++from tests.setup_helpers import happy
++
++S = SetupState
++# Touch on candle 28 (default zone touch), confirm + target-take both on candle 29.
++BULL_CONFIRM = (2031.8, 2032.3, 2031.3, 2032.0)  # closes above the FVG top 2031.5
++
++
++def _cfg(flag: bool) -> SetupConfig:
++    return dataclasses.replace(SetupConfig.from_spec(), confirm_before_chase_guard=flag)
++
++
++def test_flag_is_off_by_default():
++    assert SetupConfig.from_spec().confirm_before_chase_guard is False
++
++
++def test_legacy_target_take_on_confirm_candle_kills_the_setup():
++    """Default behaviour: chase guard pre-empts the confirmation, setup is INVALIDATED."""
++    _, result = happy(
++        rows={29: BULL_CONFIRM},
++        target_taken_at=29,
++        cfg=_cfg(False),
++    ).run()
++    setup = result.setups[0]
++    assert setup.terminal and setup.entry_plan is None
++    assert "do not chase" in (setup.reason or "")
++
++
++def test_confirm_first_recovers_the_entry_when_touched_on_a_prior_candle():
++    """Flag on: the already-touched setup confirms on candle 29 despite the target take."""
++    _, result = happy(
++        rows={29: BULL_CONFIRM},
++        target_taken_at=29,
++        cfg=_cfg(True),
++    ).run()
++    setup = result.setups[0]
++    assert setup.entry_plan is not None, f"expected a plan, got reason={setup.reason!r}"
++    assert setup.entry_plan.model in (EntryModel.M15_CLOSE, EntryModel.IFVG)
++    assert setup.state is S.BLOCKED and not setup.terminal
++
++
++def test_confirm_first_still_chases_when_no_model_confirms():
++    """Flag on but no confirmation this candle: the guard still fires, no free pass."""
++    _, result = happy(
++        rows={29: (2031.4, 2031.45, 2031.0, 2031.2)},  # stays below the FVG top: no M15_CLOSE
++        target_taken_at=29,
++        cfg=_cfg(True),
++    ).run()
++    setup = result.setups[0]
++    assert setup.entry_plan is None
++    assert setup.terminal and "do not chase" in (setup.reason or "")
+-- 
+2.47.3
+

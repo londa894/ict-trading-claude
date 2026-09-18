@@ -450,6 +450,16 @@ class _Machine:
         if (c.close < s.protective) if s.bullish else (c.close > s.protective):
             self.end(s, S.INVALIDATED, i, "closed beyond the protective extreme")
             return
+        # An already-touched setup (touch on a PRIOR candle) has had its retracement; if an
+        # entry model confirms on this candle, the entry existed and must not lose to a
+        # same-candle target take. Attempt it before the chase guard. Default OFF.
+        if (
+            self.cfg.confirm_before_chase_guard
+            and s.state in (S.ENTRY_ZONE_TOUCHED, S.WAITING_FOR_CONFIRMATION)
+            and i > s.touched_index
+            and self.confirm(s, i)
+        ):
+            return
         if chase_guard_applies(
             target_taken=self.taken_index.get(s.target.pool_id, self.n) <= i,
             zone_touched=s.touched_index >= 0,

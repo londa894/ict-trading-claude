@@ -144,7 +144,11 @@ async def main() -> None:
 
     original = SPEC.read_text(encoding="utf-8")
     base = json.loads(original)
-    pinned = {"chaseGuardAfterTouchOnly": True, "minTargetAtr": args.min_target_atr}
+    pinned = {
+        "chaseGuardAfterTouchOnly": True,
+        "confirmBeforeChaseGuard": True,
+        "minTargetAtr": args.min_target_atr,
+    }
     settings = get_settings()
 
     windows = 0
