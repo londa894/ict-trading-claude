@@ -34,6 +34,7 @@ class SetupConfig:
     bias_bars: int
     forming_approach_atr: float
     sweep_event_types: frozenset[LiquidityEventType]
+    significant_sweeps_only: bool
     mss_break_types: frozenset[StructureEventType]
     mss_require_displacement: bool
     mss_window_bars: int
@@ -59,6 +60,7 @@ class SetupConfig:
             bias_bars=int(s["bias"]["bars"]),
             forming_approach_atr=float(s["formingApproachAtr"]),
             sweep_event_types=frozenset(LiquidityEventType(x) for x in s["sweepEventTypes"]),
+            significant_sweeps_only=bool(s.get("significantSweepsOnly", False)),
             mss_break_types=breaks,
             mss_require_displacement=bool(mss["requireDisplacement"]),
             mss_window_bars=int(mss["windowBars"]),

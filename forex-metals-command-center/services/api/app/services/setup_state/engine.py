@@ -74,6 +74,7 @@ from app.services.setup_state.models import (
     SetupStepState,
     TargetRef,
 )
+from app.services.setup_state.significance import sweep_is_significant
 from app.services.structure.models import StructureEvent
 from app.services.structure.swings import true_ranges
 
@@ -205,6 +206,7 @@ class _Machine:
             if le.type in TAKE_EVENTS:
                 self.taken_index[le.pool_id] = min(self.taken_index.get(le.pool_id, i), i)
         self.pools = list(inputs.pools)
+        self.pool_by_id = {p.id: p for p in self.pools}
         kinds = {PdArrayType.FVG} | ({PdArrayType.IFVG} if self.ecfg.include_confirmed_ifvg else set())
         self.zones = {z.id: z for z in inputs.pd_zones if z.type in kinds}
         self.fvg_created: dict[str, int] = {}  # FVG: CREATED; IFVG: IFVG_CONFIRMED
@@ -274,6 +276,9 @@ class _Machine:
     def sweep(self, s: _Setup, i: int) -> LiquidityEvent | None:
         side = LiquiditySide.SSL if s.bullish else LiquiditySide.BSL
         hits = [e for e in self.liq_at.get(i, []) if e.side is side and e.type in self.cfg.sweep_event_types]
+        if self.cfg.significant_sweeps_only:
+            # Price sweeps minor swing levels constantly; only key levels may start a setup.
+            hits = [e for e in hits if sweep_is_significant(e, True)]
         if not hits:
             return None
         return min(hits, key=lambda e: e.extreme) if s.bullish else max(hits, key=lambda e: e.extreme)
