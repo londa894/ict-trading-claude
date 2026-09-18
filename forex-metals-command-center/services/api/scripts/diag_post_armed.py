@@ -1,9 +1,11 @@
 """How far past SETUP_ARMED does anything actually get?
 
-Earlier diagnostics classified TERMINAL reasons. This instead records the FURTHEST
-state each setup ever reached, which exposes where the post-armed path stalls:
-  SETUP_ARMED -> WAITING_FOR_RETRACEMENT -> ENTRY_ZONE_APPROACHING
-              -> ENTRY_ZONE_TOUCHED -> CONFIRMED
+Progress is derived from MILESTONE FIELDS, not from the sampled `state`. Terminal
+setups (INVALIDATED/EXPIRED) keep their milestones, so a setup that armed and later
+died is still counted as having armed. Reading `state` instead undercounts badly:
+a setup first observed already-terminal has no rank at all.
+
+  target -> liquidity_event -> mss (= armed) -> zone_ids -> touched_zone_id -> entry_plan
 """
 
 from __future__ import annotations
@@ -13,10 +15,9 @@ from collections import Counter
 from datetime import UTC, datetime
 
 from app.config import get_settings
-from app.domain.enums import SetupState
 from app.providers.registry import default_registry
 from app.services.candles.service import CandleService
-from app.services.setup_state.models import SetupConfig
+from app.services.setup_state.models import Setup, SetupConfig
 from app.services.setup_state.service import SetupService
 
 SYMBOL = "XAUUSD"
@@ -26,24 +27,15 @@ WINDOWS = [
 ]
 STRIDE = 4
 
-# Progress order through the post-armed path.
-ORDER = [
-    SetupState.DISCOVERED,
-    SetupState.WATCH,
-    SetupState.LIQUIDITY_EVENT,
-    SetupState.WAITING_FOR_MSS,
-    SetupState.SETUP_FORMING,
-    SetupState.SETUP_ARMED,
-    SetupState.WAITING_FOR_RETRACEMENT,
-    SetupState.ENTRY_ZONE_APPROACHING,
-    SetupState.ENTRY_ZONE_TOUCHED,
-    SetupState.WAITING_FOR_CONFIRMATION,
-    SetupState.LONG_READY,
-    SetupState.SHORT_READY,
+MILESTONES = [
+    ("discovered", lambda s: True),
+    ("target chosen", lambda s: s.target is not None),
+    ("liquidity swept", lambda s: s.liquidity_event is not None),
+    ("ARMED (mss)", lambda s: s.mss is not None),
+    ("zone formed", lambda s: bool(s.zone_ids)),
+    ("zone touched", lambda s: s.touched_zone_id is not None),
+    ("entry plan", lambda s: s.entry_plan is not None),
 ]
-RANK = {s: i for i, s in enumerate(ORDER)}
-# LONG_READY and SHORT_READY are the same rung: direction differs, progress does not.
-RANK[SetupState.SHORT_READY] = RANK[SetupState.LONG_READY]
 
 
 class Clock:
@@ -52,6 +44,15 @@ class Clock:
 
     def __call__(self) -> datetime:
         return self.at
+
+
+def depth(s: Setup) -> int:
+    """Index of the furthest milestone this setup satisfies."""
+    reached = 0
+    for i, (_, test) in enumerate(MILESTONES):
+        if test(s):
+            reached = i
+    return reached
 
 
 async def measure(start_s: str, end_s: str, label: str) -> None:
@@ -70,36 +71,36 @@ async def measure(start_s: str, end_s: str, label: str) -> None:
     series = await candles.load_series(SYMBOL, tf, min(span, 1000), end)
     steps = [c.close_time for c in series.candles if c.is_closed and start < c.close_time <= end][::STRIDE]
 
-    furthest: dict[str, int] = {}
-    plans = 0
+    best: dict[str, int] = {}
+    armed_reasons: Counter[str] = Counter()
     for t in steps:
         clock.at = t
         analysis = await svc.analyze(SYMBOL, t)
         if not analysis.eligible_for_decision:
             continue
         for s in analysis.setups:
-            r = RANK.get(s.state)
-            if r is not None:
-                furthest[s.id] = max(furthest.get(s.id, -1), r)
-            if s.entry_plan is not None:
-                plans += 1
+            d = depth(s)
+            best[s.id] = max(best.get(s.id, 0), d)
+            if s.mss is not None and s.terminal and s.reason:
+                armed_reasons[s.reason[:60]] += 1
 
-    counts: Counter[int] = Counter(furthest.values())
-    total = len(furthest)
+    total = len(best)
+    counts: Counter[int] = Counter(best.values())
     print(f"\n===== {label}: {start_s} -> {end_s} =====")
-    print(f"retracementWindowBars {cfg.retracement_window_bars}   approachAtr {cfg.retracement_approach_atr}")
-    print(f"setups {total}   entry plans {plans}\n")
-    print("furthest state reached:")
+    print(f"retracementWindowBars {cfg.retracement_window_bars}   zoneGraceBars {cfg.zone_grace_bars}")
+    print(f"setups {total}\n")
+    print(f"{'milestone':<20}{'reached':>9}{'share':>8}{'stalled':>9}")
     running = total
-    for i, state in enumerate(ORDER):
-        if state is SetupState.SHORT_READY:
-            continue  # same rung as LONG_READY
+    for i, (name, _) in enumerate(MILESTONES):
         n = counts.get(i, 0)
-        if n == 0 and i < RANK[SetupState.SETUP_ARMED]:
-            continue
-        label_txt = "LONG/SHORT_READY" if state is SetupState.LONG_READY else state.value
-        print(f"  {label_txt:<26} stalled here {n:>4}   reached {running:>4}")
+        share = f"{running / total:.0%}" if total else "-"
+        print(f"  {name:<18}{running:>9}{share:>8}{n:>9}")
         running -= n
+
+    if armed_reasons:
+        print("\nhow ARMED setups died:")
+        for reason, n in armed_reasons.most_common(8):
+            print(f"  {n:>4}  {reason}")
 
 
 async def main() -> None:
