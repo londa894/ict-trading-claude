@@ -35,6 +35,8 @@ class SetupConfig:
     forming_approach_atr: float
     sweep_event_types: frozenset[LiquidityEventType]
     significant_sweeps_only: bool
+    chase_guard_after_touch_only: bool
+    min_target_atr: float
     mss_break_types: frozenset[StructureEventType]
     mss_require_displacement: bool
     mss_window_bars: int
@@ -61,6 +63,8 @@ class SetupConfig:
             forming_approach_atr=float(s["formingApproachAtr"]),
             sweep_event_types=frozenset(LiquidityEventType(x) for x in s["sweepEventTypes"]),
             significant_sweeps_only=bool(s.get("significantSweepsOnly", False)),
+            chase_guard_after_touch_only=bool(s.get("chaseGuardAfterTouchOnly", False)),
+            min_target_atr=float(s.get("minTargetAtr", 0.0)),
             mss_break_types=breaks,
             mss_require_displacement=bool(mss["requireDisplacement"]),
             mss_window_bars=int(mss["windowBars"]),

@@ -64,6 +64,7 @@ from app.services.liquidity.models import LiquidityEvent, LiquidityPool
 from app.services.no_wick.models import NoWickEvent
 from app.services.pd_arrays.displacement import atr_before
 from app.services.pd_arrays.models import PdArrayEvent, PdArrayZone
+from app.services.setup_state.chase import chase_guard_applies
 from app.services.setup_state.models import (
     BiasPoint,
     BreakRef,
@@ -75,6 +76,7 @@ from app.services.setup_state.models import (
     TargetRef,
 )
 from app.services.setup_state.significance import sweep_is_significant
+from app.services.setup_state.targets import eligible_targets
 from app.services.structure.models import StructureEvent
 from app.services.structure.swings import true_ranges
 
@@ -261,6 +263,7 @@ class _Machine:
             and self.untaken(p, i)
             and ((p.price > close) if s.bullish else (p.price < close))
         ]
+        beyond = eligible_targets(beyond, price=close, atr=self.atr(i), min_atr=self.cfg.min_target_atr)
         return min(beyond, key=lambda p: (abs(p.price - close), p.id)) if beyond else None
 
     def near_opposite(self, s: _Setup, i: int) -> bool:
@@ -447,7 +450,11 @@ class _Machine:
         if (c.close < s.protective) if s.bullish else (c.close > s.protective):
             self.end(s, S.INVALIDATED, i, "closed beyond the protective extreme")
             return
-        if self.taken_index.get(s.target.pool_id, self.n) <= i:
+        if chase_guard_applies(
+            target_taken=self.taken_index.get(s.target.pool_id, self.n) <= i,
+            zone_touched=s.touched_index >= 0,
+            after_touch_only=self.cfg.chase_guard_after_touch_only,
+        ):
             self.end(s, S.INVALIDATED, i, "target liquidity reached before a confirmed entry (do not chase)")
             return
         live = self.live_zones(s, i)
