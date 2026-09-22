@@ -895,3 +895,16 @@ Approved and completed — see Phases 1–2 above.
   flow through `/pd-arrays` (verified 5 on H1); continuation model unaffected.
 - Next: Step 2 REVERSAL_FVG sub-state · Step 3 IFVG two-candle CONFIRMED mechanic (spec §4) · Step 4 W1
   aggregation + no-wick on 1M/30M/W1 · Step 5 forming-HTF-candle exposure.
+
+### Phase A — Step 2: IFVG two-candle CONFIRMED mechanic (spec section 4) — DONE
+- `_advance_ifvg` rewritten: CONFIRMED_IFVG now requires a LATER candle to retest the zone from the break
+  side (wick back in) and fail to close beyond the far edge (no reclaim) — the "failed retest". Replaces the
+  single-close displacement/acceptance confirmation everywhere IFVG is used. FAILED on reclaim or window
+  expiry with no retest (unchanged). `strongest`/ATR no longer needed for IFVG confirmation.
+- Tests: test_pd_arrays_engine IFVG cases rewritten (failed-retest confirm, no-retest-stays-potential,
+  confirmed-then-mitigated/invalidated); acceptance/displacement-confirm tests retired. Full pass:
+  pd-arrays engine 25/25; regression across setup/entry/scoring/no-wick/pd-properties/imr 165/165.
+- Live: 31 CONFIRMED_IFVGs on M15 via the new mechanic; feed steady.
+- NOTE: ifvg acceptanceCloses/acceptanceExtensionAtr/displacementMinGrade config is now unused (dead) — to
+  be removed with the deferred strategyVersion bump. A full continuation before/after backtest is available
+  on request (the mechanic change is intended per spec).

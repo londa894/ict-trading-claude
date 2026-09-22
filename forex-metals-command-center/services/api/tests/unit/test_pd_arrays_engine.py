@@ -153,9 +153,8 @@ def test_mitigation_states_by_wick_penetration(mitigation, state, fill, events):
 
 
 def test_close_through_invalidates_and_spawns_only_a_potential_ifvg():
-    # candle 18 closes back inside the zone and keeps high >= 11.0 so it forms no new FVG
-    # weak close-through (0.75 body, no displacement) so nothing confirms the inversion yet
-    candles, result = zones([*FVG_ROWS, (11.2, 11.3, 10.35, 10.45), (10.45, 11.05, 10.4, 10.6)])
+    # the disrespect close-through alone spawns a POTENTIAL IFVG; nothing confirms until a retest (section 4)
+    candles, result = zones([*FVG_ROWS, (12.5, 12.55, 10.1, 10.15)])
     fvg = only(result)
     assert (
         fvg.state is PdArrayState.INVALIDATED
@@ -167,22 +166,24 @@ def test_close_through_invalidates_and_spawns_only_a_potential_ifvg():
     assert ifvg.ifvg_status is IfvgStatus.POTENTIAL_IFVG and not ifvg.active
 
 
-def test_ifvg_confirmed_by_inversion_displacement():
-    candles, result = zones([*FVG_ROWS, (12.5, 12.55, 10.1, 10.15)])  # 2.35 body, ~2.1 ATR bearish
-    ifvg = only(result, PdArrayType.IFVG)
-    assert ifvg.ifvg_status is IfvgStatus.CONFIRMED_IFVG and ifvg.active
-    assert ifvg.displacement_grade is G.STRONG
-    assert [k for _, k in kinds(candles, result, ifvg.id)] == ["IFVG_POTENTIAL", "IFVG_CONFIRMED"]
-    assert next(e for e in result.events if e.type.value == "IFVG_CONFIRMED").detail == "displacement"
-
-
-def test_ifvg_confirmed_by_acceptance_closes():
-    rows = [*FVG_ROWS, (11.2, 11.3, 10.35, 10.45), (10.45, 10.5, 10.0, 10.1)]
+def test_ifvg_confirmed_by_failed_retest():
+    # 17 closes through (disrespect -> POTENTIAL); 18 retests the zone from below and fails to close
+    # beyond it -> CONFIRMED (spec section 4 two-candle mechanic, replacing displacement/acceptance).
+    rows = [*FVG_ROWS, (12.5, 12.55, 10.1, 10.15), (10.15, 11.0, 10.1, 10.3)]
     candles, result = zones(rows)
     ifvg = only(result, PdArrayType.IFVG)
-    assert kinds(candles, result, ifvg.id) == [(17, "IFVG_POTENTIAL"), (18, "IFVG_CONFIRMED")]
-    assert next(e for e in result.events if e.type.value == "IFVG_CONFIRMED").detail == "acceptance"
+    assert ifvg.ifvg_status is IfvgStatus.CONFIRMED_IFVG and ifvg.active
     assert ifvg.displacement_grade is None
+    assert [k for _, k in kinds(candles, result, ifvg.id)] == ["IFVG_POTENTIAL", "IFVG_CONFIRMED"]
+    assert next(e for e in result.events if e.type.value == "IFVG_CONFIRMED").detail == "failed retest"
+
+
+def test_ifvg_not_confirmed_without_a_retest_into_the_zone():
+    # price closes through then keeps going away (never taps back into the zone) -> stays POTENTIAL
+    rows = [*FVG_ROWS, (12.5, 12.55, 10.1, 10.15), (10.15, 10.2, 9.9, 10.0)]
+    candles, result = zones(rows)
+    ifvg = only(result, PdArrayType.IFVG)
+    assert ifvg.ifvg_status is IfvgStatus.POTENTIAL_IFVG
 
 
 def test_ifvg_fails_when_reclaimed():
@@ -202,18 +203,24 @@ def test_ifvg_fails_when_window_expires():
 
 
 def test_confirmed_ifvg_is_mitigated_from_its_own_side_and_can_be_invalidated():
-    rows = [*FVG_ROWS, (12.5, 12.55, 10.1, 10.15), (10.15, 10.75, 10.05, 10.3), (10.3, 11.3, 10.2, 11.2)]
+    # 17 close-through -> 18 failed retest confirms -> 19 wick fills half -> 20 close above invalidates
+    rows = [
+        *FVG_ROWS,
+        (12.5, 12.55, 10.1, 10.15),
+        (10.15, 11.0, 10.1, 10.3),
+        (10.3, 10.8, 10.25, 10.4),
+        (10.4, 11.6, 10.35, 11.3),
+    ]
     candles, result = zones(rows)
     original = next(z for z in result.zones if z.type is PdArrayType.FVG and z.direction is Direction.BULLISH)
     ifvg = next(z for z in result.zones if z.parent_id == original.id)
     assert kinds(candles, result, ifvg.id) == [
         (17, "IFVG_POTENTIAL"),
-        (17, "IFVG_CONFIRMED"),
-        (18, "HALF_FILL"),
-        (19, "INVALIDATED"),
+        (18, "IFVG_CONFIRMED"),
+        (19, "HALF_FILL"),
+        (20, "INVALIDATED"),
     ]
     assert ifvg.state is PdArrayState.INVALIDATED and ifvg.ifvg_status is IfvgStatus.CONFIRMED_IFVG
-    # Candle 18 (high 10.75 < candle 16 low 11.0) forms a new bearish FVG; candle 19 inverts it.
     # Every IFVG must come from an FVG: an IFVG never inverts again.
     assert all(
         z.parent_id and z.parent_id.startswith("FVG:") for z in result.zones if z.type is PdArrayType.IFVG

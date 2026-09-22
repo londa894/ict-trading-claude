@@ -149,7 +149,7 @@ def detect_fvgs(
         spawned: list[_Zone] = []
         for z in zones:
             if z.type is PdArrayType.IFVG and z.ifvg_status is IfvgStatus.POTENTIAL_IFVG:
-                _advance_ifvg(z, c, i, atr_now, strongest, cfg, emit)
+                _advance_ifvg(z, c, i, cfg, emit)
             if z.valid and i >= z.tracking_from:
                 inverted = _mitigate(z, c, i, atr_now, cfg, emit)
                 if inverted is not None:
@@ -157,8 +157,8 @@ def detect_fvgs(
         for ifvg in spawned:
             zones.append(ifvg)
             emit(ifvg, PdArrayEventType.IFVG_POTENTIAL, i, c.close, "parent FVG closed through")
-            # The inversion candle itself may already confirm (e.g. it is a displacement candle).
-            _advance_ifvg(ifvg, c, i, atr_now, strongest, cfg, emit)
+            # The inversion candle itself is never a retest; confirmation needs a later candle.
+            _advance_ifvg(ifvg, c, i, cfg, emit)
 
         if i >= 2:
             created = _create_fvg(candles, i, trs, cfg, strongest)
@@ -244,43 +244,33 @@ def _mitigate(z: _Zone, c: Candle, i: int, atr: float, cfg: PdArrayConfig, emit:
     return None
 
 
-def _advance_ifvg(
-    z: _Zone,
-    c: Candle,
-    i: int,
-    atr: float,
-    strongest: Callable[[Direction, int, int], DisplacementGrade | None],
-    cfg: PdArrayConfig,
-    emit: Emit,
-) -> None:
-    bearish = z.direction is Direction.BEARISH  # parent was bullish, price broke down
+def _advance_ifvg(z: _Zone, c: Candle, i: int, cfg: PdArrayConfig, emit: Emit) -> None:
+    """Two-candle CONFIRMED_IFVG mechanic (spec section 4), replacing single-close confirmation.
+
+    After the disrespect (the parent FVG closed through, spawning this POTENTIAL_IFVG on candle j), a LATER
+    candle must retest the zone from the break side (wick back into it) and FAIL to close beyond the far edge
+    (no reclaim). That failed retest confirms the flip. It FAILS on a reclaim (a close beyond the far edge in
+    the original direction) or on window expiry with no qualifying retest.
+    """
+    bearish = z.direction is Direction.BEARISH  # parent was bullish; price broke DOWN through the zone
     if i - z.created_index > cfg.ifvg_confirm_window_bars:
         z.ifvg_status = IfvgStatus.FAILED_IFVG
         emit(z, PdArrayEventType.IFVG_FAILED, i, c.close, "expired")
         return
-    if i > z.created_index and (c.close > z.top if bearish else c.close < z.bottom):
+    if i <= z.created_index:
+        return  # the disrespect candle itself is not a retest
+    reclaimed = (c.close > z.top) if bearish else (c.close < z.bottom)
+    if reclaimed:
         z.ifvg_status = IfvgStatus.FAILED_IFVG
         emit(z, PdArrayEventType.IFVG_FAILED, i, c.close, "reclaimed")
         return
-    beyond = c.close < z.bottom if bearish else c.close > z.top
-    z.accept_streak = z.accept_streak + 1 if beyond else 0
-    grade = strongest(z.direction, z.created_index - cfg.max_leg_candles + 1, i)
-    by_displacement = grade is not None and grade.rank >= cfg.ifvg_displacement_min_grade.rank
-    extension = (z.bottom - c.close) if bearish else (c.close - z.top)
-    by_acceptance = (
-        z.accept_streak >= cfg.ifvg_acceptance_closes and extension >= cfg.ifvg_acceptance_extension_atr * atr
-    )
-    if by_displacement or by_acceptance:
+    # Failed retest: the candle comes from the break side and wicks back into the zone without reclaiming.
+    retested = (c.low < z.bottom <= c.high) if bearish else (c.high > z.top >= c.low)
+    if retested:
         z.ifvg_status = IfvgStatus.CONFIRMED_IFVG
-        z.displacement_grade = grade if by_displacement else None
+        z.displacement_grade = None
         z.tracking_from = i + 1
-        emit(
-            z,
-            PdArrayEventType.IFVG_CONFIRMED,
-            i,
-            c.close,
-            "displacement" if by_displacement else "acceptance",
-        )
+        emit(z, PdArrayEventType.IFVG_CONFIRMED, i, c.close, "failed retest")
 
 
 def _snapshot(
