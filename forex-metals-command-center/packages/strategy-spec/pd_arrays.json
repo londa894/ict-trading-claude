@@ -21,6 +21,10 @@
     "acceptanceExtensionAtr": 0.25,
     "displacementMinGrade": "MODERATE"
   },
+  "imr": {
+    "$comment": "Immediate Rebalance: a displacement 3-candle whose gap is instantly overlapped (inverse of an FVG). minGrade is the expansion gate — no IMRs without a real displacement.",
+    "minGrade": "MODERATE"
+  },
   "quality": {
     "$comment": "Weights sum to 100. A ranking of zones, not a probability.",
     "sizeMax": 40,

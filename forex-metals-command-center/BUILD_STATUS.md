@@ -881,3 +881,17 @@ Verdict authority: **FAIL_SAFE_ONLY**. The system can only emit WAIT or UNAVAILA
 
 ### Next phase gate (Phase 0)
 Approved and completed — see Phases 1–2 above.
+
+---
+
+## Playbook Revamp (per REVERSAL_SETUP_SPEC.md + build spec) — in progress
+
+### Phase A — foundations (backtest-gated, live model untouched)
+- **Step 1: IMR (Immediate Rebalance) PD-array type — DONE.** New `PdArrayType.IMR` + `PdArrayEventType.IMR_CREATED`;
+  detector `pd_arrays/imr.py` (displacement on the middle candle b, candle c overlaps candle a = no FVG gap,
+  expansion-gated via `imr.minGrade`); merged additively into the pd-array pipeline (FVG path untouched).
+  Tests: `tests/unit/test_imr_engine.py` (bullish, bearish mirror, FVG-gap-not-IMR, expansion gate) — 4/4 PASS.
+  Regression: test_pd_arrays_engine/properties, test_setup_engine, test_models — 65/65 PASS. Live: IMR zones
+  flow through `/pd-arrays` (verified 5 on H1); continuation model unaffected.
+- Next: Step 2 REVERSAL_FVG sub-state · Step 3 IFVG two-candle CONFIRMED mechanic (spec §4) · Step 4 W1
+  aggregation + no-wick on 1M/30M/W1 · Step 5 forming-HTF-candle exposure.

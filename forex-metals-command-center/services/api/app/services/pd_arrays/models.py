@@ -29,6 +29,7 @@ class PdArrayConfig:
     strong_min_avg_body_pct: float
     qualifier_min_grade: DisplacementGrade
     qualifier_lookback_bars: int
+    imr_min_grade: DisplacementGrade  # min displacement grade for an IMR (the "expansion only" gate)
     fvg_min_size_atr: float
     fvg_touch_tolerance_atr: float
     fvg_touch_max_fill_pct: float
@@ -47,6 +48,7 @@ class PdArrayConfig:
     def from_spec(cls) -> PdArrayConfig:
         s = load_spec("pd_arrays")
         d, f, i, q = s["displacement"], s["fvg"], s["ifvg"], s["quality"]
+        imr = s.get("imr", {"minGrade": d["qualifierMinGrade"]})
         if f["invalidationRule"] != "CLOSE_THROUGH":
             raise ValueError("only CLOSE_THROUGH invalidation is implemented")
         return cls(
@@ -57,6 +59,7 @@ class PdArrayConfig:
             strong_min_avg_body_pct=float(d["strongMinAvgBodyPct"]),
             qualifier_min_grade=DisplacementGrade(d["qualifierMinGrade"]),
             qualifier_lookback_bars=int(d["qualifierLookbackBars"]),
+            imr_min_grade=DisplacementGrade(imr["minGrade"]),
             fvg_min_size_atr=float(f["minSizeAtr"]),
             fvg_touch_tolerance_atr=float(f["touchToleranceAtr"]),
             fvg_touch_max_fill_pct=float(f["touchMaxFillPct"]),

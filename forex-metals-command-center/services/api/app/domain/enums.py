@@ -347,6 +347,7 @@ class DisplacementGrade(StrEnum):
 class PdArrayType(StrEnum):
     FVG = "FVG"
     IFVG = "IFVG"
+    IMR = "IMR"  # Immediate Rebalance: a displacement whose gap is instantly overlapped (inverse of an FVG)
 
 
 class PdArrayState(StrEnum):
@@ -374,6 +375,7 @@ class PdArrayEventType(StrEnum):
     IFVG_POTENTIAL = "IFVG_POTENTIAL"
     IFVG_CONFIRMED = "IFVG_CONFIRMED"
     IFVG_FAILED = "IFVG_FAILED"
+    IMR_CREATED = "IMR_CREATED"  # an Immediate Rebalance zone formed (kept out of the alert map for now)
 
 
 # --- Phase 5: No Wick Architecture V1 ----------------------------------------------------------

@@ -36,6 +36,7 @@ from app.services.no_wick.engine import NoWickInputs, NoWickResult, analyze_no_w
 from app.services.no_wick.models import NoWickAnalysis, NoWickConfig
 from app.services.pd_arrays.displacement import detect_displacements
 from app.services.pd_arrays.fvg import detect_fvgs
+from app.services.pd_arrays.imr import detect_imrs
 from app.services.pd_arrays.models import PdArrayAnalysis, PdArrayConfig
 from app.services.pd_arrays.qualifiers import qualify_displacement
 from app.services.sessions.analysis import session_key_levels, usable
@@ -213,13 +214,16 @@ def run_pipeline(
     try:
         displacements = detect_displacements(closed, pd_cfg)
         fvgs = detect_fvgs(closed, displacements, trend, pd_cfg)
+        imrs = detect_imrs(closed, displacements, trend, pd_cfg)
         internal = qualify_displacement(
             internal, displacements, times, pd_cfg.qualifier_lookback_bars, pd_cfg.qualifier_min_grade
         )
         external = qualify_displacement(
             external, displacements, times, pd_cfg.qualifier_lookback_bars, pd_cfg.qualifier_min_grade
         )
-        pd_result = pd_arrays(displacements, fvgs.zones, fvgs.events, [])
+        pd_result = pd_arrays(
+            displacements, [*fvgs.zones, *imrs.zones], [*fvgs.events, *imrs.events], []
+        )
         pd_ok = True
     except Exception:
         logger.exception("pd-array analysis failed for %s %s", series.symbol, series.timeframe)
