@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     # Manual account profile (balance, limits, day state, user contract specs). Server-side, never committed.
     risk_profile_path: str = ""
+    # Verdict authority override: "" uses the strategy spec (FAIL_SAFE_ONLY). Set FULL to enable directional
+    # LONG/SHORT verdicts (and the ALERT_ME_WHEN_READY fire) once the directional path is trusted for live use.
+    verdict_authority: str = ""
     # Background alert monitor (runs inside the API process while it is up).
     alert_monitor_enabled: bool = True
     # AI assistant: deterministic explainer by default; an external model only with a server-side key.

@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.contracts import load_spec, strategy_version
+from app.contracts import strategy_version, verdict_authority
 from app.domain.decision import NOT_EVALUATED, UNKNOWN, MasterDecision
 from app.domain.enums import (
     AUTHORITY_SETUP_STATES,
@@ -83,11 +83,17 @@ def _next_required_event(blockers: set[Blocker]) -> str:
         return "Replace synthetic fixture data with a real independent provider"
     if blockers & {Blocker.DATA_INVALID, Blocker.NO_DATA, Blocker.DATA_STALE, Blocker.DATA_DISCONNECTED}:
         return "Restore valid, current market data"
-    return "Directional verdicts are disabled: verdict authority is FAIL_SAFE_ONLY (an explicit decision)"
+    if verdict_authority() != "FULL":
+        return "Directional verdicts are disabled: verdict authority is FAIL_SAFE_ONLY (an explicit decision)"
+    if Blocker.MARKET_CLOSED in blockers:
+        return "Market is closed: waiting for the next session"
+    return "Waiting for a qualifying setup to confirm with clean risk and news gates"
 
 
 def evaluate(gate: GateInput) -> MasterDecision:
-    blockers: set[Blocker] = {Blocker.ANALYSIS_GATES_NOT_IMPLEMENTED}
+    # Under FAIL_SAFE_ONLY there is no directional-verdict path, so a "gates not implemented" blocker stands.
+    # Under FULL that path exists (see market_state.service), so it is not a blocker.
+    blockers: set[Blocker] = set() if verdict_authority() == "FULL" else {Blocker.ANALYSIS_GATES_NOT_IMPLEMENTED}
     quality = gate.data_quality
 
     if gate.instrument is None:
@@ -135,7 +141,7 @@ def _decision(
 
 
 def enforce_verdict_authority(decision: MasterDecision) -> MasterDecision:
-    authority = load_spec("strategy_version")["verdictAuthority"]
+    authority = verdict_authority()
     # A READY/ACTIVE setup state would claim trade authority the system does not have yet.
     authority_state = decision.setup_state in {s.value for s in AUTHORITY_SETUP_STATES}
     if authority == "FAIL_SAFE_ONLY" and (decision.verdict not in FAIL_SAFE_VERDICTS or authority_state):

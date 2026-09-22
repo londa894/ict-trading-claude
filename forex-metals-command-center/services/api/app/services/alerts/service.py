@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from app.contracts import load_spec
+from app.contracts import verdict_authority
 from app.domain.enums import AlertPriority, AlertType, Direction, ReadyWatchState, Timeframe
 from app.domain.instrument import get_instrument
 from app.services.alerts.models import (
@@ -238,7 +238,7 @@ class AlertService:
         self._memory[symbol] = memory
         emitted = [a for a in (self.store.add(c, now) for c in candidates) if a is not None]
 
-        authority = str(load_spec("strategy_version")["verdictAuthority"])
+        authority = verdict_authority()
         for watch in [w for w in self._watches.values() if w.symbol == symbol]:
             if watch.state is ReadyWatchState.FIRED:
                 continue

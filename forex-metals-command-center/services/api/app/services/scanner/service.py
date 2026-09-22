@@ -12,7 +12,7 @@ import time
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
-from app.contracts import load_spec, strategy_version
+from app.contracts import strategy_version, verdict_authority
 from app.domain.enums import Blocker, DataQuality, DecisionConfidence, MarketStatus, Verdict
 from app.domain.instrument import Instrument, get_instrument, instrument_registry
 from app.services.candles.service import UnknownSymbolError
@@ -116,7 +116,7 @@ class ScannerService:
             ranking=list(RANKING_RULES),
             cache_seconds=self._cfg.cache_seconds,
             duration_ms=int((self._monotonic() - started) * 1000),
-            verdict_authority=str(load_spec("strategy_version")["verdictAuthority"]),
+            verdict_authority=verdict_authority(),
             authority=NOT_AUTHORIZED,
             strategy_version=strategy_version(),
             scanned_at=self._clock(),

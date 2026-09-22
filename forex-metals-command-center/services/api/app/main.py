@@ -5,7 +5,7 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -17,7 +17,7 @@ from app.api.routes import router
 from app.config import Settings, get_settings
 from app.contracts import strategy_version
 from app.db.session import make_engine
-from app.domain.enums import Blocker, Verdict
+from app.domain.enums import Blocker, Timeframe, Verdict
 from app.providers.base import MarketDataProvider
 from app.providers.registry import default_registry
 from app.services.alerts.service import AlertService
@@ -50,6 +50,36 @@ from app.services.setup_state.service import SetupService
 from app.services.structure.service import StructureService
 
 logger = logging.getLogger("fmcc")
+
+# Timeframes (and a generous bar count) the dashboard needs for XAUUSD. The warmer keeps the live provider's
+# cache populated for these so no user request ever triggers a synchronous upstream fetch — which is what
+# trips TradeLocker's rate limit and causes the DISCONNECTED flapping. Combined with the provider's
+# serve-stale-on-error, a cached series is always available and the feed stays steady.
+_WARM_TIMEFRAMES: dict[Timeframe, int] = {
+    Timeframe.M5: 900,
+    Timeframe.M15: 600,
+    Timeframe.M30: 600,
+    Timeframe.H1: 600,
+    Timeframe.H4: 600,
+    Timeframe.D1: 400,
+}
+_WARM_SYMBOL = "XAUUSD"  # the only deeply-validated instrument; the dashboard focuses on it
+
+
+async def _warm_provider_cache(provider: MarketDataProvider, interval: float = 20.0) -> None:
+    """Periodically refresh the live provider's quote + bar caches so requests are served warm."""
+    while True:
+        now = datetime.now(UTC)
+        try:
+            await provider.get_latest_quote(_WARM_SYMBOL)
+        except Exception:  # noqa: BLE001 - a warm cycle must never crash the loop
+            logger.debug("cache warm: quote failed", exc_info=True)
+        for tf, lim in _WARM_TIMEFRAMES.items():
+            try:
+                await provider.get_historical_bars(_WARM_SYMBOL, tf, end=now, limit=lim)
+            except Exception:  # noqa: BLE001
+                logger.debug("cache warm: %s bars failed", tf.value, exc_info=True)
+        await asyncio.sleep(interval)
 
 
 def create_app(
@@ -153,6 +183,8 @@ def create_app(
             tasks.append(asyncio.create_task(alerts.run_forever()))
         if settings.paper_monitor_enabled and settings.paper_store == "database":
             tasks.append(asyncio.create_task(paper.run_forever()))
+        if getattr(provider, "name", "") == "tradelocker":  # keep the rate-limited live feed warm
+            tasks.append(asyncio.create_task(_warm_provider_cache(provider)))
         try:
             yield
         finally:

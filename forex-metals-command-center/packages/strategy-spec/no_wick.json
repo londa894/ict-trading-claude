@@ -57,6 +57,7 @@
     "reactionWindowBars": 5
   },
   "decisionContext": {
-    "timeframe": "M15"
+    "timeframe": "M15",
+    "htfTimeframes": ["D1", "H4", "H1", "M15"]
   }
 }

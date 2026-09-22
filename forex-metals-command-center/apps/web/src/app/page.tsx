@@ -20,7 +20,6 @@ import {
   type ScanFilters,
 } from "@/components/MarketsViews";
 import { StatusBar } from "@/components/StatusBar";
-import { TradingViewTimeframes } from "@/components/TradingViewTimeframes";
 import {
   createReadyWatch,
   deleteReadyWatch,
@@ -394,7 +393,6 @@ export default function CommandCenterPage() {
           onTimeframeChange={setTimeframe}
           researchOnly={researchOnly}
           news={news}
-          secondaryToolbar={<TradingViewTimeframes />}
         />
       )}
       <IntelligencePanel

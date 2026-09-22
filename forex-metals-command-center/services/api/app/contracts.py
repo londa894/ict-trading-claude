@@ -26,3 +26,22 @@ def load_spec(name: str) -> dict[str, Any]:
 
 def strategy_version() -> str:
     return str(load_spec("strategy_version")["strategyVersion"])
+
+
+_ALLOWED_AUTHORITY = frozenset({"FAIL_SAFE_ONLY", "FULL"})
+
+
+def verdict_authority() -> str:
+    """Effective verdict authority.
+
+    Returns the VERDICT_AUTHORITY env override when it is set to a valid value (FAIL_SAFE_ONLY or FULL),
+    otherwise the committed strategy spec. This lets an operator enable directional verdicts (FULL) per
+    deployment via .env without editing the versioned spec; the safe default stays FAIL_SAFE_ONLY, so
+    tests and any environment without the override keep fail-safe behaviour.
+    """
+    from app.config import get_settings
+
+    override = (get_settings().verdict_authority or "").strip().upper()
+    if override in _ALLOWED_AUTHORITY:
+        return override
+    return str(load_spec("strategy_version")["verdictAuthority"])

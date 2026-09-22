@@ -51,7 +51,7 @@
     "NY_AM_KZ": "IDEAL",
     "NY_PM_KZ": "ACCEPTABLE",
     "LONDON_CLOSE": "ACCEPTABLE",
-    "ASIA": "LOW_QUALITY",
+    "ASIA": "ACCEPTABLE",
     "outside": "LOW_QUALITY"
   },
   "asianRange": {

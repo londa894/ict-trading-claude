@@ -20,6 +20,10 @@
     "windowBars": 24
   },
   "expireAtTradingDayEnd": true,
+  "$frequencyFlags": "Enabled 2026-09-18 to let setups reach a confirmed plan. chaseGuardAfterTouchOnly defers the do-not-chase guard until the entry zone is touched; confirmBeforeChaseGuard lets a touched setup confirm on the same candle before the guard fires; minTargetAtr ignores micro-pools nearer than 1 ATR when picking the DOL target. Same values diag_limit_probe/batch_backtest pin. Set all three back to false/0.0 to restore stock behaviour.",
+  "chaseGuardAfterTouchOnly": true,
+  "confirmBeforeChaseGuard": true,
+  "minTargetAtr": 1.0,
   "po3": { "manipulationAdrPct": 15, "distributionAdrPct": 15 },
   "decisionContext": { "timeframe": "M15" }
 }

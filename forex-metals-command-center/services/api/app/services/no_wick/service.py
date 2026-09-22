@@ -69,3 +69,37 @@ class NoWickService:
             "zoneState": zone.state.value if zone else None,
             "authority": "CONTEXT_ONLY",
         }
+
+    async def htf_context(self, symbol: str, now: datetime | None = None) -> dict[str, object]:
+        """No-wick across the tracked timeframes (D1/H4/H1/M15): latest MEANINGFUL+ event per timeframe.
+
+        Read-only HTF context for the reversal playbook (REVERSAL_SETUP_SPEC.md). Never authorizes LONG/SHORT.
+        """
+        names = load_spec("no_wick")["decisionContext"].get("htfTimeframes", [self._tf.value])
+        rows: list[dict[str, object]] = []
+        for tf in (Timeframe(t) for t in names):
+            analysis = await self.analyze(symbol, tf)
+            events = list(analysis.events) if analysis.eligible_for_decision else []
+            meaningful = [e for e in events if e.strength.rank >= NoWickStrength.MEANINGFUL.rank]
+            latest = meaningful[-1] if meaningful else (events[-1] if events else None)
+            zone = next((z for z in analysis.zones if latest and z.id == latest.zone_id), None)
+            rows.append(
+                {
+                    "timeframe": tf.value,
+                    "eligible": analysis.eligible_for_decision,
+                    "meaningfulCount": len(meaningful),
+                    "latest": (
+                        {
+                            "time": latest.time.isoformat(),
+                            "direction": latest.direction.value,
+                            "classification": latest.classification.value,
+                            "strength": latest.strength.value,
+                            "relevanceScore": latest.relevance_score,
+                            "zoneState": zone.state.value if zone else None,
+                        }
+                        if latest is not None
+                        else None
+                    ),
+                }
+            )
+        return {"symbol": symbol.upper(), "timeframes": rows, "authority": "CONTEXT_ONLY"}

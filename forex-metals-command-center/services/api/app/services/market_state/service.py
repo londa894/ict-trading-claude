@@ -9,14 +9,17 @@ from datetime import UTC, datetime
 
 from app.domain.base import ApiModel
 from app.domain.decision import MasterDecision
+from app.contracts import verdict_authority
 from app.domain.enums import (
     Blocker,
     DataQuality,
+    Direction,
     EvaluationOutcome,
     HtfBias,
     MarketStatus,
     PositionSizeStatus,
     ProviderHealthStatus,
+    SetupState,
     Timeframe,
     Verdict,
 )
@@ -253,6 +256,32 @@ class MarketStateService:
                         "setup_grade": ev.grade.value if ev.grade else None,
                         "decision_confidence": ev.confidence,
                     }
+                    if (
+                        verdict_authority() == "FULL"
+                        and ev.outcome is EvaluationOutcome.CONFIRMED_AWAITING_AUTHORITY
+                        and ev.plan is not None
+                        and ev.direction is not None
+                    ):
+                        # Directional verdict path: every gate is clear and authority is FULL, so the
+                        # confirmed deterministic plan becomes an authorized LONG/SHORT with entry/stop/targets.
+                        # enforce_verdict_authority is a pass-through under FULL. Under FAIL_SAFE_ONLY this
+                        # branch never runs, so the fail-safe gate is unchanged.
+                        bullish = ev.direction is Direction.BULLISH
+                        blockers.discard(Blocker.ANALYSIS_GATES_NOT_IMPLEMENTED)
+                        update |= {
+                            "verdict": Verdict.LONG if bullish else Verdict.SHORT,
+                            "direction": ev.direction.value,
+                            "setup_state": (
+                                SetupState.LONG_READY if bullish else SetupState.SHORT_READY
+                            ).value,
+                            "preferred_entry": ev.plan.entry,
+                            "stop": ev.plan.stop,
+                            "tp1": ev.plan.tp1,
+                            "tp2": ev.plan.tp2,
+                            "tp3": ev.plan.tp3,
+                            "rr": ev.plan.rr1,
+                            "next_required_event": "Authorized: execute the plan manually per your risk rules",
+                        }
                 update["blockers"] = ordered_blockers(blockers)
                 decision = decision.model_copy(update=update)
             except Exception:

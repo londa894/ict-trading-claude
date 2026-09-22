@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 
 from app.api.deps import AppState, get_state
-from app.contracts import load_spec, strategy_version
+from app.contracts import load_spec, strategy_version, verdict_authority
 from app.domain.base import ApiModel
 from app.domain.enums import (
     AlertCategory,
@@ -128,7 +128,7 @@ async def system_status(state: State) -> SystemStatus:
         strategy_version=spec["strategyVersion"],
         phase=spec["phase"],
         phase_name=spec["phaseName"],
-        verdict_authority=spec["verdictAuthority"],
+        verdict_authority=verdict_authority(),
         enabled_engines=spec["enabledEngines"],
         environment=state.settings.app_env,
         provider=ProviderSummary(
@@ -254,6 +254,15 @@ async def no_wick(
         )
     try:
         return await state.no_wick.analyze(symbol, timeframe, limit)
+    except UnknownSymbolError as exc:
+        raise HTTPException(status_code=404, detail="unknown symbol") from exc
+
+
+@router.get("/api/v1/no-wick/{symbol}/htf", tags=["no-wick"])
+async def no_wick_htf(symbol: Symbol, state: State) -> dict[str, object]:
+    """No-wick context across the tracked timeframes (D1/H4/H1/M15). Read-only; never a trade authorization."""
+    try:
+        return await state.no_wick.htf_context(symbol)
     except UnknownSymbolError as exc:
         raise HTTPException(status_code=404, detail="unknown symbol") from exc
 

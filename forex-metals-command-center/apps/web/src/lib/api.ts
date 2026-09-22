@@ -20,8 +20,19 @@ import {
 } from "./alerts";
 import { isAlignment, reconcileStructure, type StructureLoadState } from "./structure";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const TIMEOUT_MS = 5000;
+// Prefer an explicit override; otherwise talk to the API on the SAME host the page was loaded from
+// (port 8000). This makes it work both locally (localhost) and over Tailscale (the tailnet name)
+// without hardcoding a hostname that only resolves in one place.
+const API_HOST_OVERRIDE = process.env.NEXT_PUBLIC_API_BASE_URL;
+export const API_BASE_URL =
+  API_HOST_OVERRIDE && API_HOST_OVERRIDE.length > 0
+    ? API_HOST_OVERRIDE
+    : typeof window !== "undefined"
+      ? `${window.location.protocol}//${window.location.hostname}:8000`
+      : "http://localhost:8000";
+// The API serializes upstream (TradeLocker) calls behind a rate-limit throttle, so a cold request can take
+// several seconds. Keep this generous enough that a slow-but-successful call is not shown as "unreachable".
+const TIMEOUT_MS = 20000;
 
 async function getJson(path: string, fetcher: typeof fetch, timeoutMs = TIMEOUT_MS): Promise<unknown | null> {
   const controller = new AbortController();
