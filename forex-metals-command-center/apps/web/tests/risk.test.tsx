@@ -44,7 +44,7 @@ function risk(over: Partial<RiskAssessment> = {}): RiskAssessment {
     blockers: [],
     news: "NOT_EVALUATED",
     authority: "NOT_AUTHORIZED",
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: T,
     ...over,
   };
@@ -98,7 +98,7 @@ function evaluation(over: Partial<DecisionEvaluation> = {}): DecisionEvaluation 
     setupId: "s", setupType: "LIQUIDITY_SWEEP_MSS", setupState: "BLOCKED", score: 85, evaluatedMax: 95, grade: "A", confidence: "MODERATE",
     conflictScore: 0, dataQualityScore: 100, components: [], adjustments: [], hardBlockers: [], missingGates: ["NEWS_GATE_MISSING"],
     warnings: [], evidenceFor: [], evidenceAgainst: [], devilsAdvocate: [], plan, risk: risk(), news: null, macro: null, authority: "NOT_AUTHORIZED",
-    strategyVersion: "0.19.0-phase19", generatedAt: T, ...over,
+    strategyVersion: "0.20.0-phase20", generatedAt: T, ...over,
   };
 }
 
@@ -175,7 +175,7 @@ describe("calculateRisk", () => {
 });
 
 describe("RISK tab", () => {
-  const decision = { ...unavailableDecision("XAUUSD", ["RISK_PROFILE_MISSING"], "x", new Date(T), "0.19.0-phase19"), riskStatus: "LOCKED" };
+  const decision = { ...unavailableDecision("XAUUSD", ["RISK_PROFILE_MISSING"], "x", new Date(T), "0.20.0-phase20"), riskStatus: "LOCKED" };
 
   it("is enabled and shows the live assessment", () => {
     render(<IntelligencePanel decision={decision} data={null} status={null} trusted evaluation={{ status: "READY", evaluation: evaluation() }} />);

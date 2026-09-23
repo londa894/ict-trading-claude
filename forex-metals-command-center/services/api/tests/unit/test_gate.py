@@ -34,7 +34,7 @@ def test_best_case_is_wait_with_gates_not_implemented():
     assert B.ANALYSIS_GATES_NOT_IMPLEMENTED in d.blockers
     assert B.INSTRUMENT_SPEC_MISSING in d.blockers
     assert d.direction is None and d.entry_zone is None and d.stop is None
-    assert d.strategy_version == "0.19.0-phase19"
+    assert d.strategy_version == "0.20.0-phase20"
     assert d.setup_state == "NOT_EVALUATED" and d.htf_bias == "UNKNOWN"
 
 

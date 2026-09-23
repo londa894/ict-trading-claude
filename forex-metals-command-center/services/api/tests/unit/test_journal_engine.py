@@ -76,7 +76,7 @@ def decision(**over):
         "decisionConfidence": "MODERATE",
         "noWickState": {"classification": "BULLISH_NO_WICK", "strength": "STRONG", "direction": "BULLISH"},
         "blockers": ["ANALYSIS_GATES_NOT_IMPLEMENTED"],
-        "strategyVersion": "0.19.0-phase19",
+        "strategyVersion": "0.20.0-phase20",
     }
     base.update(over)
     return base

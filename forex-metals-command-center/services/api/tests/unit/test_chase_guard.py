@@ -17,8 +17,9 @@ from app.services.setup_state.chase import chase_guard_applies
 from app.services.setup_state.models import SetupConfig
 
 
-def test_flag_is_off_by_default_so_behaviour_is_unchanged():
-    assert SetupConfig.from_spec().chase_guard_after_touch_only is False
+def test_flag_is_enabled_in_the_shipped_spec():
+    # Enabled in setup.json as of the Playbook Revamp: the guard defers until the entry zone is touched.
+    assert SetupConfig.from_spec().chase_guard_after_touch_only is True
 
 
 def test_legacy_mode_invalidates_even_before_the_zone_is_touched():

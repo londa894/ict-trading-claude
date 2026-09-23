@@ -77,7 +77,7 @@ function analysis(over: Partial<SetupAnalysis> = {}): SetupAnalysis {
     ],
     po3: { tradingDay: "2024-01-09", phase: "MANIPULATION", dailyOpen: 2031, adr: 20, detail: "" },
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: T(61),
     ...over,
   };
@@ -153,7 +153,7 @@ describe("loadSetups", () => {
 });
 
 describe("setup progress panel (OVERVIEW)", () => {
-  const decision = { ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T(61)), "0.19.0-phase19"), setupState: "WAITING_FOR_RETRACEMENT", setupType: "LIQUIDITY_SWEEP_MSS" };
+  const decision = { ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T(61)), "0.20.0-phase20"), setupState: "WAITING_FOR_RETRACEMENT", setupType: "LIQUIDITY_SWEEP_MSS" };
 
   it("shows state, missing next step, checklist and the last closed setup", () => {
     render(<IntelligencePanel decision={decision} data={null} status={null} trusted setups={{ status: "READY", analysis: analysis() }} />);

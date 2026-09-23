@@ -8,16 +8,116 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from statistics import median
 
 from app.domain.candle import Candle
-from app.domain.enums import Direction, NoWickClassification, NoWickStrength
-from app.services.no_wick.models import CandleFeatures, NoWickConfig
+from app.domain.enums import Direction, NoWickClassification, NoWickStrength, NoWickVariant, Timeframe
+from app.services.no_wick.models import CandleFeatures, FormingCandle, NoWickConfig
 from app.services.pd_arrays.displacement import atr_before
 from app.services.structure.swings import true_ranges
 
 EPS = 1e-9
 C = NoWickClassification
+
+
+def _classify_variant(
+    direction: Direction | None,
+    maturity: float,
+    body_pct: float | None,
+    upper_wick_pct: float | None,
+    lower_wick_pct: float | None,
+    cfg: NoWickConfig,
+) -> tuple[NoWickVariant | None, Direction | None]:
+    """Read the live candle for a section-1 no-wick variant. Confluence only — never authorizes a side.
+
+    LATE_CANDLE_FADE: late in the candle (>= late maturity), directional body, still no wick on one side
+      -> expect a pullback to create that wick; signal fades TOWARD the missing wick.
+    EARLY_CANDLE_CONTINUATION: early in the candle (<= early maturity), directional body with the trailing
+      (origin-side) wick already present -> an early pullback that is continuation, not invalidation;
+      signal continues in the body direction.
+    """
+    if direction is None or body_pct is None or upper_wick_pct is None or lower_wick_pct is None:
+        return None, None
+    if body_pct < cfg.variant_min_body_pct:
+        return None, None
+    lower_missing = lower_wick_pct <= cfg.variant_max_wick_pct
+    upper_missing = upper_wick_pct <= cfg.variant_max_wick_pct
+
+    if maturity >= cfg.variant_late_min_maturity_pct:
+        if lower_missing and not upper_missing:
+            return NoWickVariant.LATE_CANDLE_FADE, Direction.BEARISH  # fade down to create the lower wick
+        if upper_missing and not lower_missing:
+            return NoWickVariant.LATE_CANDLE_FADE, Direction.BULLISH  # fade up to create the upper wick
+        if lower_missing and upper_missing:  # marubozu: fade back toward the origin (against the body)
+            fade = Direction.BEARISH if direction is Direction.BULLISH else Direction.BULLISH
+            return NoWickVariant.LATE_CANDLE_FADE, fade
+        return None, None
+
+    if maturity <= cfg.variant_early_max_maturity_pct:
+        # A trailing (origin-side) wick already formed this early -> early pullback, continuation intact.
+        trailing_present = (
+            lower_wick_pct > cfg.variant_max_wick_pct
+            if direction is Direction.BULLISH
+            else upper_wick_pct > cfg.variant_max_wick_pct
+        )
+        if trailing_present:
+            return NoWickVariant.EARLY_CANDLE_CONTINUATION, direction
+    return None, None
+
+
+def build_forming_candle(
+    timeframe: Timeframe, candles: Sequence[Candle], now: datetime, cfg: NoWickConfig
+) -> FormingCandle | None:
+    """Describe the live, not-yet-closed candle (the last bar when it is still forming), with its
+    section-1 no-wick variant (LATE_CANDLE_FADE / EARLY_CANDLE_CONTINUATION) as confluence context.
+
+    Returns None when there is no open bar (empty series, or the last bar has already closed).
+    Purely descriptive: never consumed by any engine — the decision path stays closed-bar."""
+    if not candles:
+        return None
+    c = candles[-1]
+    if c.is_closed:
+        return None
+    rng = c.high - c.low
+    body = abs(c.close - c.open)
+    upper = c.high - max(c.open, c.close)
+    lower = min(c.open, c.close) - c.low
+    total = (c.close_time - c.open_time).total_seconds()
+    elapsed = (now - c.open_time).total_seconds()
+    maturity = max(0.0, min(100.0, elapsed / total * 100)) if total > 0 else 0.0
+    direction = (
+        Direction.BULLISH if c.close > c.open else Direction.BEARISH if c.close < c.open else None
+    )
+    body_pct = body / rng if rng > 0 else None
+    upper_wick_pct = upper / rng if rng > 0 else None
+    lower_wick_pct = lower / rng if rng > 0 else None
+    variant, signal_direction = _classify_variant(
+        direction, maturity, body_pct, upper_wick_pct, lower_wick_pct, cfg
+    )
+    return FormingCandle(
+        timeframe=timeframe,
+        open_time=c.open_time,
+        close_time=c.close_time,
+        as_of=now,
+        maturity_pct=maturity,
+        direction=direction,
+        open=c.open,
+        high=c.high,
+        low=c.low,
+        close=c.close,
+        range=rng,
+        body=body,
+        upper_wick=upper,
+        lower_wick=lower,
+        body_pct=body_pct,
+        upper_wick_pct=upper_wick_pct,
+        lower_wick_pct=lower_wick_pct,
+        close_location_pct=(c.close - c.low) / rng * 100 if rng > 0 else None,
+        variant=variant,
+        signal_direction=signal_direction,
+        origin_weight=cfg.variant_origin_weights.get(timeframe.value, 0.0),
+    )
 
 
 def compute_features(candles: Sequence[Candle], cfg: NoWickConfig) -> list[CandleFeatures]:

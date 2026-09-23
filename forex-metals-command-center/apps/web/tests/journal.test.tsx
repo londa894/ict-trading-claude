@@ -43,10 +43,10 @@ function entry(over: Partial<JournalEntry> = {}): JournalEntry {
       dataQuality: "CURRENT", engineAuthorization: "NOT_AUTHORIZED", executionTimeframe: "M5", htfBias: "BULLISH", primaryDol: null,
       liquidityEvent: null, structureEvent: null, displacement: null, pdArray: null, noWick: null, newsState: "CLEAR", macroBias: null,
       macroState: null, setupType: null, setupState: "NO_SETUP", setupScore: null, setupGrade: null, confidence: "LOW", planEntry: null,
-      planStop: null, planTargets: [], planRr: null, riskStatus: "NOT_CONFIGURED", blockers: [], isSynthetic: false, strategyVersion: "0.19.0-phase19",
+      planStop: null, planTargets: [], planRr: null, riskStatus: "NOT_CONFIGURED", blockers: [], isSynthetic: false, strategyVersion: "0.20.0-phase20",
     },
     snapshot: { capturedAt: T, timing: "PRE_ENTRY", integrity: "VERIFIED", hash: HASH, decision: { verdict: "WAIT" }, evaluation: null, data: null },
-    outcome: o, outcomeRevisions: [o], strategyVersion: "0.19.0-phase19", ...over,
+    outcome: o, outcomeRevisions: [o], strategyVersion: "0.20.0-phase20", ...over,
   };
 }
 

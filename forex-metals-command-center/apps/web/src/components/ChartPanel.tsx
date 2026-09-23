@@ -23,6 +23,7 @@ import { CandleChart } from "./CandleChart";
 const DERIVED_NOTE: Partial<Record<ChartTimeframe, string>> = {
   H4: "H4 buckets: New York 17:00 close, derived from H1",
   D1: "D1 buckets: New York 17:00 close, derived from H1",
+  W1: "W1 buckets: Sunday 17:00 New York weekly open, derived H1 → D1 → W1",
 };
 
 type Props = {

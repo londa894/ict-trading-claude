@@ -33,6 +33,7 @@ from app.services.liquidity.key_levels import key_levels
 from app.services.liquidity.models import LiquidityAnalysis, LiquidityConfig, LiquidityEvent
 from app.services.liquidity.qualifiers import qualify_level
 from app.services.no_wick.engine import NoWickInputs, NoWickResult, analyze_no_wick
+from app.services.no_wick.features import build_forming_candle
 from app.services.no_wick.models import NoWickAnalysis, NoWickConfig
 from app.services.pd_arrays.displacement import detect_displacements
 from app.services.pd_arrays.fvg import detect_fvgs
@@ -111,6 +112,8 @@ def run_pipeline(
     structure = analyze_series(series, s_cfg)
     withheld = structure.internal is None and structure.external is None
     closed = [c for c in series.candles if c.is_closed]
+    # The live bar + its section-1 no-wick variant, context only. Analysis below runs on `closed`.
+    forming = build_forming_candle(series.timeframe, series.candles, series.now, nw_cfg)
     base_reasons = list(structure.ineligibility)
 
     key_ok = d1 is not None and d1.quality not in _UNUSABLE and any(c.is_closed for c in d1.candles)
@@ -176,6 +179,7 @@ def run_pipeline(
             events=result.events if result else [],
             zones=result.zones if result else [],
             zone_events=result.zone_events if result else [],
+            forming=forming,
             provider_error=series.provider_error,
             strategy_version=strategy_version(),
             generated_at=series.now,

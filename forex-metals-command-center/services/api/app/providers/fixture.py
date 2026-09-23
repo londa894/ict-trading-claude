@@ -4,9 +4,10 @@ Its prices are generated, not observed. They are NOT market facts: the decision 
 verdict on synthetic data (DATA_SYNTHETIC) and the series ends at a fixed historical date, so it
 also classifies as STALE against a real clock.
 
-One M5 base series per symbol is generated; M15 and H1 are aggregated from it so that every
-timeframe describes the same synthetic price path. H4/D1 are not served natively (the candle engine
-derives them from H1). The window spans the 2024-03-10 US DST change on purpose.
+One M5 base series per symbol is generated; M15, M30 and H1 are aggregated from it so that every
+timeframe describes the same synthetic price path. H4/D1/W1 are not served natively (the candle engine
+derives them from H1). M1 is finer than the M5 base and is not synthesized. The window spans the
+2024-03-10 US DST change on purpose.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from app.services.timeframes.core import expected_slots
 SERIES_START = datetime(2024, 2, 25, 23, 0, tzinfo=UTC)  # Sunday 18:00 New York (EST)
 SERIES_END = datetime(2024, 4, 19, 21, 0, tzinfo=UTC)  # Friday 17:00 New York (EDT)
 BASE_TIMEFRAME = Timeframe.M5
-NATIVE_TIMEFRAMES = (Timeframe.M5, Timeframe.M15, Timeframe.H1)
+NATIVE_TIMEFRAMES = (Timeframe.M5, Timeframe.M15, Timeframe.M30, Timeframe.H1)
 _BASE_PRICE = {"XAUUSD": 2030.0, "XAGUSD": 23.0, "USDJPY": 144.0}
 _DEFAULT_BASE = 1.1
 

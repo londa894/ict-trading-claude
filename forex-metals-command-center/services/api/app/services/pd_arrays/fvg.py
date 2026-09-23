@@ -92,7 +92,10 @@ class _Zone:
     def valid(self) -> bool:
         if self.state is PdArrayState.INVALIDATED:
             return False
-        return self.type is PdArrayType.FVG or self.ifvg_status is IfvgStatus.CONFIRMED_IFVG
+        return (
+            self.type in (PdArrayType.FVG, PdArrayType.REVERSAL_FVG)
+            or self.ifvg_status is IfvgStatus.CONFIRMED_IFVG
+        )
 
 
 @dataclass(frozen=True)
@@ -102,6 +105,16 @@ class FvgResult:
 
 
 Emit = Callable[[_Zone, PdArrayEventType, int, float, str], None]
+
+# Inefficiencies that block a REVERSAL_FVG from being used as a confirmation source (spec section 3).
+# Order blocks are not modelled in this engine, so they are not considered.
+_BLOCKING_INEFFICIENCIES = frozenset({PdArrayType.FVG, PdArrayType.IFVG, PdArrayType.IMR})
+
+
+def reversal_fvg_eligible(zones: Sequence[PdArrayZone]) -> bool:
+    """Spec section 3 precondition: a REVERSAL_FVG may act as a confirmation source ONLY when no OTHER active
+    inefficiency (regular FVG, IFVG, IMR) exists on the chart at decision time. Callers must gate on this."""
+    return not any(z.active and z.type in _BLOCKING_INEFFICIENCIES for z in zones)
 
 
 def detect_fvgs(
@@ -154,11 +167,15 @@ def detect_fvgs(
                 inverted = _mitigate(z, c, i, atr_now, cfg, emit)
                 if inverted is not None:
                     spawned.append(inverted)
-        for ifvg in spawned:
-            zones.append(ifvg)
-            emit(ifvg, PdArrayEventType.IFVG_POTENTIAL, i, c.close, "parent FVG closed through")
-            # The inversion candle itself is never a retest; confirmation needs a later candle.
-            _advance_ifvg(ifvg, c, i, cfg, emit)
+        for sp in spawned:
+            zones.append(sp)
+            if sp.type is PdArrayType.REVERSAL_FVG:
+                emit(sp, PdArrayEventType.REVERSAL_FVG_CREATED, i, sp.midpoint, "confirmed IFVG disrespected")
+                sp.state_index = None  # creation is not a mitigation state change
+            else:
+                emit(sp, PdArrayEventType.IFVG_POTENTIAL, i, c.close, "parent FVG closed through")
+                # The inversion candle itself is never a retest; confirmation needs a later candle.
+                _advance_ifvg(sp, c, i, cfg, emit)
 
         if i >= 2:
             created = _create_fvg(candles, i, trs, cfg, strongest)
@@ -224,6 +241,20 @@ def _mitigate(z: _Zone, c: Candle, i: int, atr: float, cfg: PdArrayConfig, emit:
                 parent_id=z.id,
                 ifvg_status=IfvgStatus.POTENTIAL_IFVG,
                 tracking_from=NOT_TRACKED,
+            )
+        if z.type is PdArrayType.IFVG and z.ifvg_status is IfvgStatus.CONFIRMED_IFVG:
+            # second disrespect: a confirmed IFVG was closed back through -> REVERSAL_FVG in the ORIGINAL
+            # direction (opposite of the IFVG). It behaves as an FVG-like zone; the chain ends here.
+            return _Zone(
+                id=f"REVFVG:{z.id}:{c.open_time.isoformat()}",
+                type=PdArrayType.REVERSAL_FVG,
+                direction=Direction.BEARISH if bullish else Direction.BULLISH,
+                top=z.top,
+                bottom=z.bottom,
+                source_times=list(z.source_times),
+                created_index=i,
+                parent_id=z.id,
+                tracking_from=i + 1,
             )
         return None
     if penetration < -cfg.fvg_touch_tolerance_atr * atr or z.size <= 0:

@@ -41,6 +41,7 @@ from app.services.paper.service import PaperService
 from app.services.paper.store import DatabasePaperStore, PaperStore, UnconfiguredPaperStore
 from app.services.pd_arrays.service import PdArrayService
 from app.services.replay.service import ReplayService
+from app.services.reversal.service import ReversalService
 from app.services.risk.service import RiskService
 from app.services.risk.store import RiskProfileStore
 from app.services.scanner.service import ScannerService
@@ -103,6 +104,7 @@ def create_app(
     no_wick = NoWickService(candles)
     sessions = SessionService(candles)
     setups = SetupService(candles, sessions)
+    reversal = ReversalService(candles)
     risk = RiskService(RiskProfileStore(settings.risk_profile_path or None))
     news = NewsService(create_calendar(settings.calendar_provider, settings.calendar_file_path), clock)
     macro = MacroService(create_macro(settings.macro_provider, settings.macro_file_path), candles, clock)
@@ -120,6 +122,7 @@ def create_app(
         evaluation=evaluation,
         news=news,
         macro=macro,
+        reversal=reversal,
     )
 
     journal_store: JournalStore = (
@@ -210,6 +213,7 @@ def create_app(
         no_wick=no_wick,
         sessions=sessions,
         setups=setups,
+        reversal=reversal,
         evaluation=evaluation,
         risk=risk,
         scanner=scanner,

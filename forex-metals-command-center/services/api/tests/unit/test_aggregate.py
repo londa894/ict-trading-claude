@@ -5,7 +5,7 @@ import pytest
 from app.domain.enums import AssetClass, Timeframe
 from app.domain.enums import ValidationIssueCode as C
 from app.services.candles.normalize import build_series
-from app.services.timeframes.aggregate import AggregationError, aggregate
+from app.services.timeframes.aggregate import AggregationError, aggregate, aggregate_weekly
 from app.services.timeframes.core import floor_to_timeframe, is_aligned
 from tests.helpers import TUE_10_UTC, after_last, bar, consecutive_bars
 
@@ -67,6 +67,13 @@ def test_bucket_spanning_daily_break_is_complete_with_open_slots_only():
     s = series(raw)
     out, issues = aggregate(s.candles, Timeframe.M5, Timeframe.H1, AssetClass.METAL, after_last(raw))
     assert out[0].is_closed and issues == []
+
+
+def test_weekly_rejects_non_d1_source():
+    # aggregate_weekly only accepts D1 candles; the generic aggregate() still refuses W1 as a target.
+    s = series(consecutive_bars(TUE_10_UTC, 3))  # M5 candles
+    with pytest.raises(AggregationError):
+        aggregate_weekly(s.candles, AssetClass.METAL, TUE_10_UTC)
 
 
 def test_rejects_unsupported_combinations():

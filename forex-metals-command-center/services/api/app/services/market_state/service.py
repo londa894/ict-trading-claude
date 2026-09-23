@@ -7,9 +7,9 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from app.contracts import verdict_authority
 from app.domain.base import ApiModel
 from app.domain.decision import MasterDecision
-from app.contracts import verdict_authority
 from app.domain.enums import (
     Blocker,
     DataQuality,
@@ -20,6 +20,7 @@ from app.domain.enums import (
     PositionSizeStatus,
     ProviderHealthStatus,
     SetupState,
+    SetupType,
     Timeframe,
     Verdict,
 )
@@ -42,6 +43,7 @@ from app.services.news.service import NewsService
 from app.services.news.service import decision_context as news_decision_context
 from app.services.no_wick.service import NoWickService
 from app.services.pd_arrays.service import PdArrayService
+from app.services.reversal.service import ReversalService
 from app.services.scoring.service import EvaluationService
 from app.services.sessions.service import SessionService
 from app.services.setup_state.service import SetupService
@@ -86,6 +88,7 @@ class MarketStateService:
         evaluation: EvaluationService | None = None,
         news: NewsService | None = None,
         macro: MacroService | None = None,
+        reversal: ReversalService | None = None,
     ) -> None:
         self._provider = provider
         self._structure = structure
@@ -95,6 +98,7 @@ class MarketStateService:
         self._sessions = sessions
         self._setups = setups
         self._evaluation = evaluation
+        self._reversal = reversal
         self._news = news
         self._macro = macro
         self._bus = bus
@@ -317,6 +321,15 @@ class MarketStateService:
             except Exception:
                 logger.exception("macro decision context failed for %s", symbol)
             decision = enforce_verdict_authority(decision)
+        if self._reversal is not None and decision.verdict is not Verdict.UNAVAILABLE:
+            # Counter-bias reversal (REVERSAL_NO_WICK_IFVG), behind its own A/B flag. Dormant unless the
+            # flag is on AND authority is FULL. Conflict rule: a continuation directional verdict wins, so
+            # the reversal only fires when the decision is still non-directional and every gate is clear.
+            try:
+                decision = await self._apply_reversal(symbol, now, decision)
+            except Exception:
+                logger.exception("reversal decision context failed for %s", symbol)
+            decision = enforce_verdict_authority(decision)
         await self._publish_if_changed(decision)
         return MarketStateResponse(
             decision=decision,
@@ -332,6 +345,48 @@ class MarketStateService:
                 issues=issues,
                 provider_error=provider_error,
             ),
+        )
+
+    async def _apply_reversal(
+        self, symbol: str, now: datetime, decision: MasterDecision
+    ) -> MasterDecision:
+        """Contribute a counter-bias reversal LONG/SHORT, gated hard by the A/B flag + FULL authority.
+
+        No-op unless: the reversal flag is on, authority is FULL, the current reversal is BLOCKED with a
+        full plan, no blockers remain, and the decision is not already directional (continuation wins)."""
+        # Cheap gates first — skip the (multi-timeframe) reversal analysis entirely when it can't fire:
+        # flag off, wrong authority, already-directional (continuation wins), or a gate blocks.
+        if (
+            self._reversal is None
+            or not self._reversal.enabled
+            or verdict_authority() != "FULL"
+            or decision.verdict in (Verdict.LONG, Verdict.SHORT)
+            or decision.blockers
+        ):
+            return decision
+        rev = await self._reversal.analyze(symbol, now)
+        cur = rev.current
+        if not (
+            cur is not None
+            and cur.state is SetupState.BLOCKED
+            and cur.entry_price is not None
+            and cur.stop_price is not None
+            and cur.target_price is not None
+        ):
+            return decision
+        bullish = cur.direction is Direction.BULLISH
+        return decision.model_copy(
+            update={
+                "verdict": Verdict.LONG if bullish else Verdict.SHORT,
+                "direction": cur.direction.value,
+                "setup_type": SetupType.REVERSAL_NO_WICK_IFVG.value,
+                "setup_state": (SetupState.LONG_READY if bullish else SetupState.SHORT_READY).value,
+                "preferred_entry": cur.entry_price,
+                "stop": cur.stop_price,
+                "tp1": cur.target_price,
+                "rr": cur.rr,
+                "next_required_event": "Authorized (reversal): execute the plan manually per your risk rules",
+            }
         )
 
     async def _publish_if_changed(self, decision: MasterDecision) -> None:

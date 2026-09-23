@@ -24,7 +24,7 @@ def test_health():
     r = client().get("/health")
     assert r.status_code == 200
     body = r.json()
-    assert body["status"] == "ok" and body["strategyVersion"] == "0.19.0-phase19"
+    assert body["status"] == "ok" and body["strategyVersion"] == "0.20.0-phase20"
 
 
 def test_system_status_declares_broker_free_and_never_leaks_secrets():

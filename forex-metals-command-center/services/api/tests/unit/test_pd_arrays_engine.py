@@ -181,7 +181,7 @@ def test_ifvg_confirmed_by_failed_retest():
 def test_ifvg_not_confirmed_without_a_retest_into_the_zone():
     # price closes through then keeps going away (never taps back into the zone) -> stays POTENTIAL
     rows = [*FVG_ROWS, (12.5, 12.55, 10.1, 10.15), (10.15, 10.2, 9.9, 10.0)]
-    candles, result = zones(rows)
+    _candles, result = zones(rows)
     ifvg = only(result, PdArrayType.IFVG)
     assert ifvg.ifvg_status is IfvgStatus.POTENTIAL_IFVG
 
@@ -221,11 +221,14 @@ def test_confirmed_ifvg_is_mitigated_from_its_own_side_and_can_be_invalidated():
         (20, "INVALIDATED"),
     ]
     assert ifvg.state is PdArrayState.INVALIDATED and ifvg.ifvg_status is IfvgStatus.CONFIRMED_IFVG
-    # Every IFVG must come from an FVG: an IFVG never inverts again.
+    # Every IFVG still comes from an FVG.
     assert all(
         z.parent_id and z.parent_id.startswith("FVG:") for z in result.zones if z.type is PdArrayType.IFVG
     )
-    assert not [z for z in result.zones if z.parent_id == ifvg.id]
+    # The 2nd disrespect (candle 20) spawns exactly one REVERSAL_FVG child in the original direction.
+    children = [z for z in result.zones if z.parent_id == ifvg.id]
+    assert len(children) == 1
+    assert children[0].type is PdArrayType.REVERSAL_FVG and children[0].direction is Direction.BULLISH
 
 
 def test_trend_alignment_only_changes_quality():

@@ -20,6 +20,7 @@ from app.services.no_wick.service import NoWickService
 from app.services.paper.service import PaperService
 from app.services.pd_arrays.service import PdArrayService
 from app.services.replay.service import ReplayService
+from app.services.reversal.service import ReversalService
 from app.services.risk.service import RiskService
 from app.services.scanner.service import ScannerService
 from app.services.scoring.service import EvaluationService
@@ -40,6 +41,7 @@ class AppState:
     no_wick: NoWickService
     sessions: SessionService
     setups: SetupService
+    reversal: ReversalService
     evaluation: EvaluationService
     risk: RiskService
     scanner: ScannerService

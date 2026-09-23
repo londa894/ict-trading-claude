@@ -81,7 +81,7 @@ describe("ChartPanel", () => {
     const onChange = vi.fn();
     render(<ChartPanel symbol="XAUUSD" timeframe="M5" state={null} onTimeframeChange={onChange} />);
     const group = screen.getByRole("group", { name: "Timeframe" });
-    expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["M5", "M15", "H1", "H4", "D1"]);
+    expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]);
     fireEvent.click(within(group).getByText("H4"));
     expect(onChange).toHaveBeenCalledWith("H4");
     expect(screen.getByText(/Loading M5 candles/)).toBeTruthy();
@@ -90,7 +90,7 @@ describe("ChartPanel", () => {
 
 describe("StatusBar", () => {
   it("shows the Master Decision verdict and marks unbuilt fields N/A instead of inventing values", () => {
-    const decision = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", NOW, "0.19.0-phase19");
+    const decision = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", NOW, "0.20.0-phase20");
     render(<StatusBar decision={decision} data={null} chart={ready} />);
     expect(screen.getByTestId("verdict").textContent).toBe("UNAVAILABLE");
     expect(screen.getByTestId("last-close").textContent).toBe("2030.5");
@@ -151,7 +151,7 @@ describe("appendEvents", () => {
 });
 
 describe("STRUCTURE tab (Phase 2)", () => {
-  const decision = { ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", NOW, "0.19.0-phase19"), htfBias: "UNKNOWN" };
+  const decision = { ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", NOW, "0.20.0-phase20"), htfBias: "UNKNOWN" };
   const level = {
     level: "EXTERNAL" as const,
     pivotLength: 10,
@@ -193,7 +193,7 @@ describe("STRUCTURE tab (Phase 2)", () => {
       },
     ],
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: "2024-01-09T10:16:00Z",
   };
 
@@ -213,7 +213,7 @@ describe("STRUCTURE tab (Phase 2)", () => {
           timeframes: [
             { timeframe: "D1", state: null, trend: null, quality: "STALE", eligibleForDecision: false, ineligibility: ["INSUFFICIENT_CANDLES"] },
           ],
-          strategyVersion: "0.19.0-phase19",
+          strategyVersion: "0.20.0-phase20",
           generatedAt: "2024-01-09T10:16:00Z",
         }}
       />,

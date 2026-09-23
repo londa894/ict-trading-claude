@@ -233,7 +233,8 @@ def analyze_liquidity(
     as_of_atr = atr(n - 1)
     last_close = candles[-1].close
     pools = _snapshot(active, candles, last_close, as_of_atr, trend, cfg)
-    return LiquidityResult(pools=pools, events=events, dol=select_dol(pools, as_of_atr, cfg))
+    dol_trend = trend if cfg.trend_aligned_targeting else TrendDirection.NONE
+    return LiquidityResult(pools=pools, events=events, dol=select_dol(pools, as_of_atr, cfg, dol_trend))
 
 
 def _cluster(

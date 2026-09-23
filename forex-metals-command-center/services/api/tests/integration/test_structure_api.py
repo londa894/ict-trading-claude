@@ -40,7 +40,7 @@ def test_structure_endpoint_matches_chart_candles(fixture_client, tf):
     candles = fixture_client.get("/api/v1/candles/XAUUSD", params={"timeframe": tf}).json()["candles"]
     times = {c["time"] for c in candles}
 
-    assert body["timeframe"] == tf and body["strategyVersion"] == "0.19.0-phase19"
+    assert body["timeframe"] == tf and body["strategyVersion"] == "0.20.0-phase20"
     assert body["isSynthetic"] is True
     assert body["eligibleForDecision"] is False and "DATA_SYNTHETIC" in body["ineligibility"]
     assert body["internal"]["level"] == "INTERNAL" and body["external"]["level"] == "EXTERNAL"
@@ -81,7 +81,7 @@ def test_stale_data_analysed_but_not_eligible():
 
 
 def test_structure_request_validation(fixture_client):
-    assert fixture_client.get("/api/v1/structure/XAUUSD", params={"timeframe": "W1"}).status_code == 422
+    assert fixture_client.get("/api/v1/structure/XAUUSD", params={"timeframe": "MN1"}).status_code == 422
     assert fixture_client.get("/api/v1/structure/XAUUSD", params={"limit": 0}).status_code == 422
     assert fixture_client.get("/api/v1/structure/BTCUSD").status_code == 404
     assert fixture_client.get("/api/v1/structure/BTCUSD/alignment").status_code == 404

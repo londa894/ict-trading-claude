@@ -18,9 +18,9 @@ function answer(over: Partial<AssistantAnswer> = {}): AssistantAnswer {
     answer: "Master Decision primary DOL (H1): H1 BSL EQH x3 @ 2050.91.",
     facts: [{ label: "Decision primary DOL (H1)", value: "H1 BSL EQH x3 @ 2050.91", source: "get_market_state" }],
     unknowns: [], tools: [{ name: "get_market_state", symbol: "XAUUSD", status: "OK", detail: null }],
-    decision: { symbol: "XAUUSD", verdict: "WAIT", dataQuality: "CURRENT", blockers: ["ANALYSIS_GATES_NOT_IMPLEMENTED"], strategyVersion: "0.19.0-phase19", updatedAt: T },
+    decision: { symbol: "XAUUSD", verdict: "WAIT", dataQuality: "CURRENT", blockers: ["ANALYSIS_GATES_NOT_IMPLEMENTED"], strategyVersion: "0.20.0-phase20", updatedAt: T },
     proposal: null, provider: "DETERMINISTIC", model: null, guard: { status: "NOT_APPLICABLE", violations: [] },
-    authority: "NOT_AUTHORIZED", strategyVersion: "0.19.0-phase19", generatedAt: T, ...over,
+    authority: "NOT_AUTHORIZED", strategyVersion: "0.20.0-phase20", generatedAt: T, ...over,
   };
 }
 
@@ -88,7 +88,7 @@ function routes(result: AssistantAnswer | object, created: string[] = []) {
 
 describe("AI_ANALYSIS tab", () => {
   it("is enabled in the panel and shows the scope disclaimer", () => {
-    const decision = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T), "0.19.0-phase19");
+    const decision = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T), "0.20.0-phase20");
     render(<IntelligencePanel decision={decision} data={null} status={null} trusted={false} />);
     fireEvent.click(screen.getByRole("tab", { name: "AI_ANALYSIS" }));
     expect(screen.queryByTestId("tab-not-available")).toBeNull();

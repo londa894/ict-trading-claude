@@ -53,7 +53,10 @@ class Candle(ApiModel):
 
     @model_validator(mode="after")
     def _close_time_matches_timeframe(self) -> Candle:
-        if self.timeframe is Timeframe.MN1:
+        # W1 (Sunday-anchored trading week) and MN1 have calendar-variable UTC lengths — a week that
+        # spans a DST change is 7d +/- 1h — so only ordering is enforced. Fixed-duration timeframes
+        # (intraday, H4, D1) must match their duration exactly.
+        if self.timeframe.is_trading_week_anchored or self.timeframe is Timeframe.MN1:
             if self.close_time <= self.open_time:
                 raise ValueError("close_time must be after open_time")
         elif self.close_time - self.open_time != self.timeframe.duration:

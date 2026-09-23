@@ -104,8 +104,9 @@ function analysis(over: Partial<SessionAnalysis> = {}): SessionAnalysis {
     previousSession: { instanceId: "ASIA:2024-01-09", session: "ASIA", high: 2035, low: 2025, end: Z(5) },
     adr: { adr: 20, periodDays: 14, currentRange: 11, pctUsed: 55, expansion: "ACTIVE" },
     judas: [judas()],
+    sweepConfluence: [],
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: Z(8, 30),
     ...over,
   };
@@ -198,7 +199,7 @@ describe("loadSessions", () => {
 });
 
 describe("SESSION tab, status bar and decision state", () => {
-  const base = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(Z(9)), "0.19.0-phase19");
+  const base = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(Z(9)), "0.20.0-phase20");
   const state: SessionDecisionState = {
     tradingDay: "2024-01-09", marketStatus: "OPEN", activeSessions: ["LONDON"], activeKillZones: ["LONDON_KZ"],
     timeQuality: "IDEAL", sessionQuality: "IDEAL", asianRangeState: "NORMAL", adrPctUsed: 55, expansion: "ACTIVE",

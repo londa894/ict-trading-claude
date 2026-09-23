@@ -14,6 +14,7 @@ from app.domain.enums import (
     NoWickClassification,
     NoWickContextFactor,
     NoWickStrength,
+    NoWickVariant,
     NoWickZoneEventType,
     NoWickZoneState,
     ScoreComponentStatus,
@@ -52,6 +53,11 @@ class NoWickConfig:
     zone_approach_distance_atr: float
     zone_reaction_atr: float
     zone_reaction_window_bars: int
+    variant_late_min_maturity_pct: float
+    variant_early_max_maturity_pct: float
+    variant_max_wick_pct: float
+    variant_min_body_pct: float
+    variant_origin_weights: dict[str, float]
 
     @classmethod
     def from_spec(cls) -> NoWickConfig:
@@ -59,6 +65,7 @@ class NoWickConfig:
         c, st, q, ctx, r, z = (
             s[k] for k in ("classification", "strength", "quality", "context", "relevance", "zone")
         )
+        v = s["variants"]
         return cls(
             atr_period=int(load_spec("structure")["atrPeriod"]),
             true_body_pct=float(c["trueBodyPct"]),
@@ -89,6 +96,11 @@ class NoWickConfig:
             zone_approach_distance_atr=float(z["approachDistanceAtr"]),
             zone_reaction_atr=float(z["reactionAtr"]),
             zone_reaction_window_bars=int(z["reactionWindowBars"]),
+            variant_late_min_maturity_pct=float(v["lateCandleMinMaturityPct"]),
+            variant_early_max_maturity_pct=float(v["earlyCandleMaxMaturityPct"]),
+            variant_max_wick_pct=float(v["maxWickPct"]),
+            variant_min_body_pct=float(v["minBodyPct"]),
+            variant_origin_weights={k: float(val) for k, val in v["originTimeframeWeights"].items()},
         )
 
 
@@ -177,6 +189,38 @@ class NoWickZoneEvent(ApiModel):
     detail: str
 
 
+class FormingCandle(ApiModel):
+    """The currently-forming (not-yet-closed) candle on this timeframe, with how far through its
+    bucket it is and its running geometry.
+
+    Read-only context for the reversal playbook's LATE_CANDLE_FADE / EARLY_CANDLE_CONTINUATION
+    variants (spec section 1). It is NEVER fed into a verdict or a no-wick event — the decision
+    engine stays strictly closed-bar; this only describes the live bar as it stands right now.
+    Ratios follow CandleFeatures (fraction 0..1, null when range is zero)."""
+
+    timeframe: Timeframe
+    open_time: datetime
+    close_time: datetime
+    as_of: datetime  # the clock at which this snapshot was taken
+    maturity_pct: float  # 0..100, wall-clock elapsed through the bucket
+    direction: Direction | None  # BULLISH close>open, BEARISH close<open, null when flat
+    open: float
+    high: float
+    low: float
+    close: float  # last traded price so far
+    range: float
+    body: float
+    upper_wick: float
+    lower_wick: float
+    body_pct: float | None
+    upper_wick_pct: float | None
+    lower_wick_pct: float | None
+    close_location_pct: float | None  # (close - low) / range * 100
+    variant: NoWickVariant | None  # section 1 forming-candle signal; null when neither variant applies
+    signal_direction: Direction | None  # fade / continuation direction of the variant
+    origin_weight: float  # origin-timeframe directional-quality weight (0 when the TF is not weighted)
+
+
 class NoWickAnalysis(ApiModel):
     symbol: str
     timeframe: Timeframe
@@ -190,6 +234,7 @@ class NoWickAnalysis(ApiModel):
     events: list[NoWickEvent]
     zones: list[NoWickZone]
     zone_events: list[NoWickZoneEvent]
+    forming: FormingCandle | None  # the live bar (context only); null when the last bar is closed
     provider_error: str | None
     strategy_version: str
     generated_at: datetime

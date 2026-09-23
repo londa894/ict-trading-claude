@@ -42,9 +42,18 @@ CODE = {
     PdArrayEventType.IFVG_POTENTIAL: "O",
     PdArrayEventType.IFVG_CONFIRMED: "X",
     PdArrayEventType.IFVG_FAILED: "Z",
+    PdArrayEventType.REVERSAL_FVG_CREATED: "R",  # IMR_CREATED is exercised by detect_imrs, not this harness
 }
 FVG_GRAMMAR = re.compile(r"^CT?P?H?F?I?$")
 IFVG_GRAMMAR = re.compile(r"^O(XT?P?H?F?I?|Z)?$")
+REVFVG_GRAMMAR = re.compile(r"^RT?P?H?F?I?$")  # created via the 2nd disrespect, then FVG-like mitigation
+IMR_GRAMMAR = re.compile(r"^M$")  # phase A: detection only, no mitigation lifecycle yet
+GRAMMARS = {
+    PdArrayType.FVG: FVG_GRAMMAR,
+    PdArrayType.IFVG: IFVG_GRAMMAR,
+    PdArrayType.REVERSAL_FVG: REVFVG_GRAMMAR,
+    PdArrayType.IMR: IMR_GRAMMAR,
+}
 
 
 def _stats(seed):
@@ -71,11 +80,12 @@ def test_lifecycle_grammar_and_price_invariants(seed):
             PdArrayEventType.CREATED,
             PdArrayEventType.IFVG_POTENTIAL,
             PdArrayEventType.IFVG_CONFIRMED,
+            PdArrayEventType.REVERSAL_FVG_CREATED,
             PdArrayEventType.INVALIDATED,
         )
     for zid, seq in sequences.items():
-        grammar = FVG_GRAMMAR if zones[zid].type is PdArrayType.FVG else IFVG_GRAMMAR
-        assert grammar.match(seq), (zid, seq)
+        grammar = GRAMMARS[zones[zid].type]
+        assert grammar.match(seq), (zid, seq, zones[zid].type)
     for z in result.zones:
         assert z.bottom < z.top and z.bottom <= z.midpoint <= z.top
         assert 0 <= z.fill_pct <= 100

@@ -123,11 +123,17 @@ import {
   type AdrState,
   type JudasSwing,
   type PreviousSession,
+  type OriginZone,
+  type ReversalAnalysis,
+  type ReversalEvent,
+  type ReversalSetup,
   type SessionAnalysis,
   type SessionClock,
   type SessionInstance,
+  type SessionSweepConfluence,
   type SessionOpens,
   type CandleFeatures,
+  type FormingCandle,
   type NoWickAnalysis,
   type NoWickEvent,
   type NoWickZone,
@@ -211,7 +217,7 @@ Object.assign(TS_FIELDS, {
   LiquidityPool: fields<LiquidityPool>()(["id","type","side","scope","label","price","formedAt","knownAt","sourceTimes","state","touches","stateChangedAt","taken","distanceAtr","magnetScore"]),
   LiquidityEvent: fields<LiquidityEvent>()(["id","poolId","poolType","side","type","price","time","extreme","close"]),
   DolTarget: fields<DolTarget>()(["poolId","type","side","label","price","magnetScore","distanceAtr"]),
-  DolSelection: fields<DolSelection>()(["primary","secondary","confidence","margin","reason"]),
+  DolSelection: fields<DolSelection>()(["primary","secondary","confidence","eligibility","margin","reason"]),
   LiquidityAnalysis: fields<LiquidityAnalysis>()(["symbol","timeframe","asOf","candleCount","quality","isSynthetic","eligibleForDecision","ineligibility","keyLevelsAvailable","pools","events","dol","providerError","strategyVersion","generatedAt"]),
 });
 
@@ -227,7 +233,8 @@ Object.assign(TS_FIELDS, {
   NoWickEvent: fields<NoWickEvent>()(["id","direction","shape","classification","tags","strength","time","open","high","low","close","bodyPct","upperWickPct","lowerWickPct","bodyAtr","closeLocationPct","insideBar","candleQualityScore","contextScore","relevanceScore","contextComponents","zoneId"]),
   NoWickZone: fields<NoWickZone>()(["id","eventId","direction","closeLevel","level25","level50","level75","openLevel","originExtreme","fvgOverlapIds","obOverlap","state","rebalancePct","createdAt","knownAt","stateChangedAt","ageBars","active","relevanceScore"]),
   NoWickZoneEvent: fields<NoWickZoneEvent>()(["id","zoneId","direction","type","time","price","detail"]),
-  NoWickAnalysis: fields<NoWickAnalysis>()(["symbol","timeframe","asOf","candleCount","quality","isSynthetic","eligibleForDecision","ineligibility","features","events","zones","zoneEvents","providerError","strategyVersion","generatedAt"]),
+  NoWickAnalysis: fields<NoWickAnalysis>()(["symbol","timeframe","asOf","candleCount","quality","isSynthetic","eligibleForDecision","ineligibility","features","events","zones","zoneEvents","forming","providerError","strategyVersion","generatedAt"]),
+  FormingCandle: fields<FormingCandle>()(["timeframe","openTime","closeTime","asOf","maturityPct","direction","open","high","low","close","range","body","upperWick","lowerWick","bodyPct","upperWickPct","lowerWickPct","closeLocationPct","variant","signalDirection","originWeight"]),
 });
 Object.assign(TS_FIELDS, {
   SessionClock: fields<SessionClock>()(["now","newYorkTime","londonTime","tradingDay","marketStatus","activeSessions","activeKillZones","timeQuality","nextSession","nextSessionStart"]),
@@ -236,7 +243,12 @@ Object.assign(TS_FIELDS, {
   PreviousSession: fields<PreviousSession>()(["instanceId","session","high","low","end"]),
   AdrState: fields<AdrState>()(["adr","periodDays","currentRange","pctUsed","expansion"]),
   JudasSwing: fields<JudasSwing>()(["id","tradingDay","session","direction","status","asianHigh","asianLow","asianMidpoint","sweepTime","sweepExtreme","resolvedAt","detail"]),
-  SessionAnalysis: fields<SessionAnalysis>()(["symbol","sourceTimeframe","asOf","candleCount","quality","isSynthetic","eligibleForDecision","ineligibility","clock","sessionQuality","instances","opens","previousSession","adr","judas","providerError","strategyVersion","generatedAt"]),
+  SessionAnalysis: fields<SessionAnalysis>()(["symbol","sourceTimeframe","asOf","candleCount","quality","isSynthetic","eligibleForDecision","ineligibility","clock","sessionQuality","instances","opens","previousSession","adr","judas","sweepConfluence","providerError","strategyVersion","generatedAt"]),
+  SessionSweepConfluence: fields<SessionSweepConfluence>()(["id","tradingDay","session","side","asiaLevel","londonLevel","sweepTime","sweepExtreme","detail"]),
+  OriginZone: fields<OriginZone>()(["id","kind","timeframe","direction","bodyTop","bodyBottom","farEdge","weight","knownAt"]),
+  ReversalEvent: fields<ReversalEvent>()(["id","setupId","direction","state","time","price","detail"]),
+  ReversalSetup: fields<ReversalSetup>()(["id","setupType","direction","state","terminal","tradingDay","origin","discoveredAt","stateChangedAt","rebalancedAt","reactionAt","armedAt","confirmations","confirmingZoneIds","protectiveLevel","entryPrice","entryZoneId","stopPrice","targetPrice","targetPoolId","targetLabel","rr","reason"]),
+  ReversalAnalysis: fields<ReversalAnalysis>()(["symbol","timeframe","asOf","candleCount","quality","isSynthetic","enabled","eligibleForDecision","ineligibility","bias","originCount","current","setups","events","providerError","strategyVersion","generatedAt"]),
 });
 Object.assign(TS_FIELDS, {
   BiasPoint: fields<BiasPoint>()(["timeframe","direction","knownAt","eventId"]),

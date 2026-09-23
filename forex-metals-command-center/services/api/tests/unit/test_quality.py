@@ -66,6 +66,15 @@ def test_d1_bar_on_utc_midnight_convention_is_invalid():
     assert quality_at(raw, datetime(2024, 1, 13, 6, 0, tzinfo=UTC), tf=Timeframe.D1) is DataQuality.INVALID
 
 
-def test_unsupported_weekly_timeframe_fails_safe():
-    raw = [bar(datetime(2024, 1, 7, 22, 0, tzinfo=UTC), tf=Timeframe.W1)]
-    assert quality_at(raw, datetime(2024, 1, 20, 6, 0, tzinfo=UTC), tf=Timeframe.W1) is DataQuality.INVALID
+def test_weekly_timeframe_is_supported_and_alignment_enforced():
+    # W1 is now aggregated by the candle engine (Step 4): an aligned, recent weekly bar is CURRENT.
+    aligned = [bar(datetime(2024, 1, 7, 22, 0, tzinfo=UTC), tf=Timeframe.W1)]  # Sun 17:00 EST open
+    assert (
+        quality_at(aligned, datetime(2024, 1, 20, 6, 0, tzinfo=UTC), tf=Timeframe.W1) is DataQuality.CURRENT
+    )
+    # A weekly bar that does not sit on the Sunday open still fails safe.
+    misaligned = [bar(datetime(2024, 1, 8, 22, 0, tzinfo=UTC), tf=Timeframe.W1)]  # Monday, not a week open
+    assert (
+        quality_at(misaligned, datetime(2024, 1, 20, 6, 0, tzinfo=UTC), tf=Timeframe.W1)
+        is DataQuality.INVALID
+    )

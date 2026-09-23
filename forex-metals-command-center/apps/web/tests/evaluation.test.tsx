@@ -52,7 +52,7 @@ function evaluation(over: Partial<DecisionEvaluation> = {}): DecisionEvaluation 
     news: null,
     macro: null,
     authority: "NOT_AUTHORIZED",
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: T,
     ...over,
   };
@@ -89,7 +89,7 @@ describe("reconcileEvaluation", () => {
 });
 
 describe("ENTRY tab and status bar", () => {
-  const decision = { ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T), "0.19.0-phase19"), setupScore: 85, setupGrade: "A" };
+  const decision = { ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T), "0.20.0-phase20"), setupScore: 85, setupGrade: "A" };
 
   it("shows NOT AUTHORIZED, the plan, the breakdown, evidence and the devil's advocate", () => {
     render(<IntelligencePanel decision={decision} data={null} status={null} trusted evaluation={{ status: "READY", evaluation: evaluation() }} />);
@@ -158,7 +158,7 @@ describe("setup payloads with Phase 8 states", () => {
       { id: "b", setupId: blocked.id, direction: "BULLISH", state: "BLOCKED", time: T, price: 2032, detail: "" },
     ],
     po3: { tradingDay: null, phase: "UNCLEAR", dailyOpen: null, adr: null, detail: "" }, providerError: null,
-    strategyVersion: "0.19.0-phase19", generatedAt: T,
+    strategyVersion: "0.20.0-phase20", generatedAt: T,
   };
 
   it("accepts BLOCKED (with a plan) and ENTRY_MISSED, and draws not-authorized plan lines", () => {

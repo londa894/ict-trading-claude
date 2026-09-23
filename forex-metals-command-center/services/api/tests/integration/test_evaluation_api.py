@@ -122,7 +122,7 @@ def _confirmed_evaluation() -> DecisionEvaluation:
         news=None,
         macro=None,
         authority="NOT_AUTHORIZED",
-        strategy_version="0.19.0-phase19",
+        strategy_version="0.20.0-phase20",
         generated_at=t,
     )
 

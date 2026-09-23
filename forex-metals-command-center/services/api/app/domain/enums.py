@@ -53,9 +53,14 @@ class Timeframe(StrEnum):
         return self in (Timeframe.H4, Timeframe.D1)
 
     @property
+    def is_trading_week_anchored(self) -> bool:
+        """True for W1: buckets anchored to the Sunday 17:00 -> Friday 17:00 New York trading week."""
+        return self is Timeframe.W1
+
+    @property
     def is_engine_supported(self) -> bool:
-        """Timeframes the candle engine can align, gap-check and aggregate. W1/MN1 are not supported yet."""
-        return self.is_fixed_intraday or self.is_trading_day_anchored
+        """Timeframes the candle engine can align, gap-check and aggregate. MN1 is not supported yet."""
+        return self.is_fixed_intraday or self.is_trading_day_anchored or self.is_trading_week_anchored
 
     @property
     def duration(self) -> timedelta:
@@ -330,6 +335,18 @@ class DolConfidence(StrEnum):
     UNCLEAR = "UNCLEAR"
 
 
+class LiquidityEligibility(StrEnum):
+    """Why the DOL selection chose its target, given the HTF structure trend (reversal spec section 5).
+
+    Bias-aligned continuation targeting only draws toward trend-aligned external liquidity; the reversal
+    setup is exempt (it targets against the standing structure state)."""
+
+    EXTERNAL_TREND_ALIGNED = "EXTERNAL_TREND_ALIGNED"  # primary is trend-aligned external liquidity
+    INTERNAL_ONLY = "INTERNAL_ONLY"  # no eligible external draw; only internal pullback liquidity remained
+    UNRESTRICTED = "UNRESTRICTED"  # trend NONE/ranging -> no eligibility filter applied
+    REVERSAL_EXEMPT = "REVERSAL_EXEMPT"  # reversal setup: filter bypassed, targets the opposite draw
+
+
 # --- Phase 4: displacement + FVG/IFVG -------------------------------------------------------------
 
 
@@ -348,6 +365,7 @@ class PdArrayType(StrEnum):
     FVG = "FVG"
     IFVG = "IFVG"
     IMR = "IMR"  # Immediate Rebalance: a displacement whose gap is instantly overlapped (inverse of an FVG)
+    REVERSAL_FVG = "REVERSAL_FVG"  # FVG -> IFVG -> (2nd disrespect) reverts toward the original bias
 
 
 class PdArrayState(StrEnum):
@@ -376,6 +394,7 @@ class PdArrayEventType(StrEnum):
     IFVG_CONFIRMED = "IFVG_CONFIRMED"
     IFVG_FAILED = "IFVG_FAILED"
     IMR_CREATED = "IMR_CREATED"  # an Immediate Rebalance zone formed (kept out of the alert map for now)
+    REVERSAL_FVG_CREATED = "REVERSAL_FVG_CREATED"  # a confirmed IFVG was disrespected a 2nd time (reversal)
 
 
 # --- Phase 5: No Wick Architecture V1 ----------------------------------------------------------
@@ -405,6 +424,15 @@ class NoWickStrength(StrEnum):
     @property
     def rank(self) -> int:
         return list(NoWickStrength).index(self)
+
+
+class NoWickVariant(StrEnum):
+    """No-wick trade variant read from the live (forming) candle (reversal spec section 1).
+
+    Confluence only — never authorizes LONG/SHORT on its own."""
+
+    LATE_CANDLE_FADE = "LATE_CANDLE_FADE"  # late in the candle, still one-sided: fade toward the missing wick
+    EARLY_CANDLE_CONTINUATION = "EARLY_CANDLE_CONTINUATION"  # early wick then continuation, not invalidation
 
 
 class NoWickZoneState(StrEnum):
@@ -514,6 +542,12 @@ class SetupState(StrEnum):
     SETUP_FORMING = "SETUP_FORMING"
     LIQUIDITY_EVENT = "LIQUIDITY_EVENT"
     WAITING_FOR_MSS = "WAITING_FOR_MSS"
+    # Reversal (REVERSAL_NO_WICK_IFVG) states — the counter-bias origin -> rebalance -> reaction ->
+    # confirmation path (reversal spec section 6). Shared enum so the verdict/UI read them generically.
+    REBALANCE_WATCH = "REBALANCE_WATCH"
+    REBALANCE_TOUCH = "REBALANCE_TOUCH"
+    REACTION = "REACTION"
+    CONFIRMATION = "CONFIRMATION"
     SETUP_ARMED = "SETUP_ARMED"
     WAITING_FOR_RETRACEMENT = "WAITING_FOR_RETRACEMENT"
     ENTRY_ZONE_APPROACHING = "ENTRY_ZONE_APPROACHING"
@@ -531,6 +565,22 @@ class SetupState(StrEnum):
 
 class SetupType(StrEnum):
     LIQUIDITY_SWEEP_MSS = "LIQUIDITY_SWEEP_MSS"
+    REVERSAL_NO_WICK_IFVG = "REVERSAL_NO_WICK_IFVG"
+
+
+class ReversalOriginKind(StrEnum):
+    """The HTF origin zone a reversal setup rebalances into (reversal spec section 6)."""
+
+    NO_WICK = "NO_WICK"
+    IMR = "IMR"
+
+
+class ReversalConfirmation(StrEnum):
+    """A confirmation that can arm a reversal after the reaction (any one is sufficient; section 6)."""
+
+    IFVG_FLIP = "IFVG_FLIP"  # confirmed IFVG at the origin (two-candle mechanic, section 4)
+    NEW_FVG = "NEW_FVG"  # a fresh FVG left by the reversal displacement leg
+    IMR = "IMR"  # a fresh IMR left by the reversal leg — strongest single confirmation
 
 
 class SetupStep(StrEnum):
@@ -1062,6 +1112,7 @@ CONTRACT_ENUMS: dict[str, type[StrEnum]] = {
     "LiquidityState": LiquidityState,
     "LiquidityEventType": LiquidityEventType,
     "DolConfidence": DolConfidence,
+    "LiquidityEligibility": LiquidityEligibility,
     "DisplacementGrade": DisplacementGrade,
     "PdArrayType": PdArrayType,
     "PdArrayState": PdArrayState,
@@ -1069,6 +1120,7 @@ CONTRACT_ENUMS: dict[str, type[StrEnum]] = {
     "PdArrayEventType": PdArrayEventType,
     "NoWickClassification": NoWickClassification,
     "NoWickStrength": NoWickStrength,
+    "NoWickVariant": NoWickVariant,
     "NoWickZoneState": NoWickZoneState,
     "NoWickZoneEventType": NoWickZoneEventType,
     "NoWickContextFactor": NoWickContextFactor,
@@ -1082,6 +1134,8 @@ CONTRACT_ENUMS: dict[str, type[StrEnum]] = {
     "JudasStatus": JudasStatus,
     "SetupState": SetupState,
     "SetupType": SetupType,
+    "ReversalOriginKind": ReversalOriginKind,
+    "ReversalConfirmation": ReversalConfirmation,
     "SetupStep": SetupStep,
     "SetupStepStatus": SetupStepStatus,
     "Po3Phase": Po3Phase,

@@ -31,10 +31,10 @@ function report(over: Partial<AnalyticsReport> = {}): AnalyticsReport {
     alertUsefulness: { available: false, reason: "alerts are kept in memory and are not linked to journal or paper records yet" },
     decisionRecords: { NO_TRADE: 1, MISSED_ENTRY: 1 },
     excluded: { tampered: 0, synthetic: 0, notClosed: 1, filtered: 0 },
-    includesSynthetic: false, strategyVersions: ["0.19.0-phase19"],
+    includesSynthetic: false, strategyVersions: ["0.20.0-phase20"],
     equityCurve: [{ at: T, cumulativeR: 2 }, { at: T, cumulativeR: 1 }, { at: T, cumulativeR: 4.05 }],
     disclaimer: "Recorded history only. Not a probability, forecast, guarantee or trade signal; small samples are labelled.",
-    authority: "DESCRIPTIVE_ONLY", strategyVersion: "0.19.0-phase19", generatedAt: T, ...over,
+    authority: "DESCRIPTIVE_ONLY", strategyVersion: "0.20.0-phase20", generatedAt: T, ...over,
   };
 }
 

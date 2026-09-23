@@ -66,7 +66,7 @@ def fixture_client():
 
 def test_sessions_endpoint(fixture_client):
     body = fixture_client.get("/api/v1/sessions/XAUUSD").json()
-    assert body["strategyVersion"] == "0.19.0-phase19" and body["sourceTimeframe"] == "M15"
+    assert body["strategyVersion"] == "0.20.0-phase20" and body["sourceTimeframe"] == "M15"
     assert body["eligibleForDecision"] is False and "DATA_SYNTHETIC" in body["ineligibility"]
     assert body["clock"]["marketStatus"] == "CLOSED" and body["clock"]["timeQuality"] == "AVOID"
     assert body["clock"]["nextSession"] == "ASIA"

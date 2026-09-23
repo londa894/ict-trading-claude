@@ -27,7 +27,9 @@ def test_imr_bullish_detects_immediate_rebalance() -> None:
     assert z.direction is Direction.BULLISH
     assert (z.bottom, z.top) == (10.5, 13.2)  # [a.high, c.close]
     assert z.active and z.state.value == "FRESH"
-    assert any(e.type is PdArrayEventType.IMR_CREATED and e.zone_type is PdArrayType.IMR for e in result.events)
+    assert any(
+        e.type is PdArrayEventType.IMR_CREATED and e.zone_type is PdArrayType.IMR for e in result.events
+    )
 
     # and there is NO FVG on that same 3-candle window (candle 3 overlapped candle 1)
     fvgs = detect_fvgs(candles, disps, TrendDirection.BULLISH, pd_cfg())
@@ -51,7 +53,11 @@ def test_fvg_gap_is_not_imr() -> None:
     disps = detect_displacements(candles, pd_cfg())
     assert not detect_imrs(candles, disps, TrendDirection.BULLISH, pd_cfg()).zones
     # sanity: the FVG engine does see a gap here
-    assert [f for f in detect_fvgs(candles, disps, TrendDirection.BULLISH, pd_cfg()).zones if f.type is PdArrayType.FVG]
+    assert [
+        f
+        for f in detect_fvgs(candles, disps, TrendDirection.BULLISH, pd_cfg()).zones
+        if f.type is PdArrayType.FVG
+    ]
 
 
 def test_no_displacement_no_imr() -> None:
@@ -60,3 +66,41 @@ def test_no_displacement_no_imr() -> None:
     candles = ohlc_candles(rows)
     disps = detect_displacements(candles, pd_cfg())
     assert not detect_imrs(candles, disps, TrendDirection.BULLISH, pd_cfg()).zones
+
+
+# --- REVERSAL_FVG chain (spec section 3) ----------------------------------------------------------
+from app.domain.enums import IfvgStatus, PdArrayState  # noqa: E402
+from app.services.pd_arrays.fvg import reversal_fvg_eligible  # noqa: E402
+
+# FVG_ROWS builds a bullish FVG at [10.5, 11.0] on candle 16.
+_FVG_ROWS = [*BASE, (10.0, 10.5, 9.5, 10.4), (10.4, 12.2, 10.3, 12.1), (12.1, 12.6, 11.0, 12.5)]
+
+
+def _fvg_zones(rows):
+    candles = ohlc_candles(rows)
+    return candles, detect_fvgs(
+        candles, detect_displacements(candles, pd_cfg()), TrendDirection.NONE, pd_cfg()
+    )
+
+
+def test_reversal_fvg_chain_fvg_ifvg_reversal() -> None:
+    # 17 close-through -> POTENTIAL IFVG; 18 failed retest -> CONFIRMED IFVG; 19 closes back through the
+    # IFVG's far edge (2nd disrespect) -> REVERSAL_FVG in the original (bullish) direction.
+    rows = [*_FVG_ROWS, (12.5, 12.55, 10.1, 10.15), (10.15, 11.0, 10.1, 10.3), (10.3, 11.5, 10.25, 11.3)]
+    _candles, result = _fvg_zones(rows)
+    rev = [z for z in result.zones if z.type is PdArrayType.REVERSAL_FVG]
+    assert len(rev) == 1
+    r = rev[0]
+    assert r.direction is Direction.BULLISH and r.active and (r.bottom, r.top) == (10.5, 11.0)
+    assert any(e.type.value == "REVERSAL_FVG_CREATED" for e in result.events)
+    ifvg = next(z for z in result.zones if z.type is PdArrayType.IFVG)
+    assert ifvg.state is PdArrayState.INVALIDATED and ifvg.ifvg_status is IfvgStatus.CONFIRMED_IFVG
+    # with only the REVERSAL_FVG active (parent FVG + IFVG invalidated), it is an eligible confirmation source
+    assert reversal_fvg_eligible(result.zones) is True
+
+
+def test_reversal_fvg_ineligible_while_another_inefficiency_is_active() -> None:
+    # a plain fresh FVG is active -> a REVERSAL_FVG could not be used as a confirmation source here
+    _, result = _fvg_zones(_FVG_ROWS)
+    assert [z for z in result.zones if z.type is PdArrayType.FVG and z.active]
+    assert reversal_fvg_eligible(result.zones) is False

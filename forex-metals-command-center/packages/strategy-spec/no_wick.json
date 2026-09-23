@@ -8,6 +8,22 @@
     "oneSidedMaxWickPct": 0.05,
     "oneSidedMinBodyPct": 0.5
   },
+  "variants": {
+    "$comment": "Section 1 forming-candle variants. Maturity is wall-clock % through the bucket. Origin-timeframe weights are directional-quality multipliers (D1/W1 > H4 > H1 > 30M), NOT probabilities.",
+    "lateCandleMinMaturityPct": 75.0,
+    "earlyCandleMaxMaturityPct": 25.0,
+    "maxWickPct": 0.05,
+    "minBodyPct": 0.5,
+    "originTimeframeWeights": {
+      "W1": 1.0,
+      "D1": 1.0,
+      "H4": 0.7,
+      "H1": 0.5,
+      "M30": 0.3,
+      "M15": 0.2,
+      "M5": 0.15
+    }
+  },
   "strength": {
     "meaningfulBodyAtr": 0.8,
     "strongBodyAtr": 1.2,
@@ -58,6 +74,6 @@
   },
   "decisionContext": {
     "timeframe": "M15",
-    "htfTimeframes": ["D1", "H4", "H1", "M15"]
+    "htfTimeframes": ["W1", "D1", "H4", "H1", "M30", "M15"]
   }
 }

@@ -54,7 +54,7 @@ def missing_bars_since(last_closed: Candle, asset_class: AssetClass, now: dateti
     tf = last_closed.timeframe
     if tf.is_engine_supported:
         return sum(1 for _ in expected_slots(asset_class, tf, last_closed.open_time, until, limit=limit))
-    return limit  # W1/MN1: freshness cannot be proven by the candle engine yet -> fail safe
+    return limit  # MN1: freshness cannot be proven by the candle engine yet -> fail safe
 
 
 def classify_candle_series(

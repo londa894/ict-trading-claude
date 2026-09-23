@@ -21,6 +21,7 @@ from app.services.sessions.clock import downgrade, session_clock
 from app.services.sessions.judas import detect_judas
 from app.services.sessions.levels import build_instances, opens, previous_session
 from app.services.sessions.models import SessionAnalysis, SessionConfig, SessionInstance, SessionOpens
+from app.services.sessions.sweep_confluence import detect_sweep_confluence
 
 UNUSABLE = frozenset({DataQuality.INVALID, DataQuality.DISCONNECTED})
 
@@ -116,6 +117,7 @@ def analyze_sessions(
     prev = None
     adr = None
     judas = []
+    sweep_confluence = []
     as_of = max((c.close_time for c in closed), default=None)
     if failed:
         reasons.append(AnalysisIneligibility.SESSION_ANALYSIS_FAILED)
@@ -125,6 +127,7 @@ def analyze_sessions(
         prev = previous_session(instances, as_of)
         adr = adr_state(d1.candles if usable(d1) and d1 is not None else [], closed, as_of, cfg.adr)
         judas = detect_judas(closed, instances, as_of, cfg)
+        sweep_confluence = detect_sweep_confluence(closed, instances, as_of, cfg)
     quality = None
     if as_of is not None and not failed and source.quality not in UNUSABLE:
         quality = clock.time_quality
@@ -146,6 +149,7 @@ def analyze_sessions(
         previous_session=prev,
         adr=adr,
         judas=judas,
+        sweep_confluence=sweep_confluence,
         provider_error=source.provider_error,
         strategy_version=strategy_version(),
         generated_at=now,

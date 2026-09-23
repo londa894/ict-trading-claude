@@ -19,6 +19,7 @@ from typing import Protocol
 
 from app.domain.enums import (
     DolConfidence,
+    LiquidityEligibility,
     LiquidityPoolType,
     LiquidityScope,
     LiquiditySide,
@@ -89,26 +90,102 @@ def _target(p: LiquidityPool) -> DolTarget:
     )
 
 
-def select_dol(pools: Sequence[LiquidityPool], atr: float, cfg: LiquidityConfig) -> DolSelection:
+_WEEK_LEVELS = frozenset({LiquidityPoolType.PWH, LiquidityPoolType.PWL})
+_DAY_LEVELS = frozenset({LiquidityPoolType.PDH, LiquidityPoolType.PDL})
+_SESSION_LEVELS = frozenset(
+    {
+        LiquidityPoolType.ASIA_HIGH,
+        LiquidityPoolType.ASIA_LOW,
+        LiquidityPoolType.LONDON_HIGH,
+        LiquidityPoolType.LONDON_LOW,
+        LiquidityPoolType.NY_AM_HIGH,
+        LiquidityPoolType.NY_AM_LOW,
+        LiquidityPoolType.NY_PM_HIGH,
+        LiquidityPoolType.NY_PM_LOW,
+    }
+)
+
+
+def significance_rank(pool_type: LiquidityPoolType) -> int:
+    """Significant-liquidity tier (spec section 5): week > day > session > everything else.
+
+    Used as a deterministic tiebreak when eligible pools score alike (higher timeframe wins), and by the
+    setup layer to score session/day/week-aligned "silver bullet" macro windows."""
+    if pool_type in _WEEK_LEVELS:
+        return 3
+    if pool_type in _DAY_LEVELS:
+        return 2
+    if pool_type in _SESSION_LEVELS:
+        return 1
+    return 0
+
+
+def _counter_trend_external(p: LiquidityPool, trend: TrendDirection) -> bool:
+    """External liquidity against the HTF trend — not a bias-aligned continuation draw (spec section 5).
+
+    Internal pools are always eligible (pullback liquidity); the filter only excludes external liquidity
+    on the wrong side of a directional trend."""
+    if p.scope is not LiquidityScope.EXTERNAL:
+        return False
+    if trend is TrendDirection.BULLISH:
+        return p.side is LiquiditySide.SSL  # external lows are not a draw in an uptrend
+    if trend is TrendDirection.BEARISH:
+        return p.side is LiquiditySide.BSL  # external highs are not a draw in a downtrend
+    return False
+
+
+def _eligibility(
+    trend: TrendDirection, reversal_exempt: bool, primary: LiquidityPool | None
+) -> LiquidityEligibility:
+    if reversal_exempt:
+        return LiquidityEligibility.REVERSAL_EXEMPT
+    if trend is TrendDirection.NONE:
+        return LiquidityEligibility.UNRESTRICTED
+    if primary is not None and primary.scope is LiquidityScope.EXTERNAL:
+        return LiquidityEligibility.EXTERNAL_TREND_ALIGNED
+    return LiquidityEligibility.INTERNAL_ONLY
+
+
+def select_dol(
+    pools: Sequence[LiquidityPool],
+    atr: float,
+    cfg: LiquidityConfig,
+    trend: TrendDirection = TrendDirection.NONE,
+    *,
+    reversal_exempt: bool = False,
+) -> DolSelection:
+    """Pick the draw-on-liquidity target.
+
+    For bias-aligned continuation (the default), counter-trend external pools are ineligible: in an
+    uptrend the draw is external highs (+ internal pullback liquidity), in a downtrend external lows.
+    A reversal setup passes ``reversal_exempt=True`` to bypass the filter and target the opposite draw.
+    """
+    scored = [p for p in pools if not p.taken and p.magnet_score is not None and p.distance_atr is not None]
+    filter_on = not reversal_exempt and trend is not TrendDirection.NONE
+    eligible = [p for p in scored if not _counter_trend_external(p, trend)] if filter_on else scored
+    # Rank by magnet score, then significant-liquidity tier (week > day > session), then proximity.
     candidates = sorted(
-        (p for p in pools if not p.taken and p.magnet_score is not None and p.distance_atr is not None),
-        key=lambda p: (-(p.magnet_score or 0.0), p.distance_atr or 0.0, p.id),
+        eligible,
+        key=lambda p: (-(p.magnet_score or 0.0), -significance_rank(p.type), p.distance_atr or 0.0, p.id),
     )
     if atr <= 0:
         return DolSelection(
             primary=None,
             secondary=None,
             confidence=DolConfidence.UNCLEAR,
+            eligibility=_eligibility(trend, reversal_exempt, None),
             margin=None,
             reason="ATR is zero; distances undefined",
         )
     if not candidates:
+        no_draw = "No untaken trend-aligned liquidity pools" if filter_on else "No untaken liquidity pools"
         return DolSelection(
             primary=None,
             secondary=None,
             confidence=DolConfidence.UNCLEAR,
+            eligibility=_eligibility(trend, reversal_exempt, None),
             margin=None,
-            reason="No untaken liquidity pools",
+            reason=no_draw,
         )
     primary = candidates[0]
     secondary = next(
@@ -137,6 +214,7 @@ def select_dol(pools: Sequence[LiquidityPool], atr: float, cfg: LiquidityConfig)
         primary=_target(primary),
         secondary=_target(secondary) if secondary else None,
         confidence=confidence,
+        eligibility=_eligibility(trend, reversal_exempt, primary),
         margin=margin,
         reason=reason,
     )

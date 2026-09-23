@@ -58,7 +58,7 @@ def analysis(candles, result, *, eligible=True):
         events=result.events,
         po3=Po3State(trading_day=None, phase=Po3Phase.UNCLEAR, daily_open=None, adr=None, detail=""),
         provider_error=None,
-        strategy_version="0.19.0-phase19",
+        strategy_version="0.20.0-phase20",
         generated_at=NOW,
     )
 

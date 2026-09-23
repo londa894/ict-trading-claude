@@ -25,7 +25,7 @@ function payload(overrides: Record<string, unknown> = {}) {
     candles: [candle("2024-01-09T10:00:00Z"), candle("2024-01-09T10:05:00Z", 2030, 2032, 2030, 2031, false)],
     issues: [],
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: "2024-01-09T10:07:00Z",
     ...overrides,
   };

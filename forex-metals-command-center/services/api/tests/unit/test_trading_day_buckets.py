@@ -7,7 +7,7 @@ import pytest
 from app.domain.enums import AssetClass, Timeframe
 from app.domain.enums import ValidationIssueCode as C
 from app.services.candles.normalize import build_series
-from app.services.timeframes.aggregate import aggregate
+from app.services.timeframes.aggregate import aggregate, aggregate_weekly
 from app.services.timeframes.core import (
     UnsupportedTimeframeError,
     bucket_start,
@@ -15,10 +15,11 @@ from app.services.timeframes.core import (
     is_aligned,
     next_bucket_start,
     trading_day_start,
+    trading_week_start,
 )
 from tests.helpers import consecutive_bars
 
-H4, D1, H1 = Timeframe.H4, Timeframe.D1, Timeframe.H1
+H4, D1, H1, W1 = Timeframe.H4, Timeframe.D1, Timeframe.H1, Timeframe.W1
 
 
 def utc(*a):
@@ -81,9 +82,10 @@ def test_alignment_rules():
     assert is_aligned(utc(2024, 1, 9, 22, 0), D1)
     assert not is_aligned(utc(2024, 1, 10, 0, 0), D1)  # UTC-midnight daily convention rejected
     assert not is_aligned(utc(2024, 1, 10, 0, 0), H4)
-    assert not is_aligned(utc(2024, 1, 7, 22, 0), Timeframe.W1)
+    assert is_aligned(utc(2024, 1, 7, 22, 0), Timeframe.W1)  # Sun 17:00 EST = weekly open
+    assert not is_aligned(utc(2024, 1, 8, 22, 0), Timeframe.W1)  # Monday is not a week open
     with pytest.raises(UnsupportedTimeframeError):
-        bucket_start(utc(2024, 1, 9), Timeframe.W1)
+        bucket_start(utc(2024, 1, 9), Timeframe.MN1)  # MN1 remains unsupported
 
 
 def test_d1_expected_slots_skip_weekend():
@@ -140,3 +142,81 @@ def test_dst_sunday_d1_bucket_is_24h():
     assert out[0].open_time == utc(2024, 3, 10, 21, 0)
     assert out[0].close_time - out[0].open_time == timedelta(hours=24)
     assert out[0].is_closed
+
+
+# --- W1: Sunday 17:00 NY weekly open (Step 4) --------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("instant", "expected"),
+    [
+        (utc(2024, 1, 10, 12, 0), utc(2024, 1, 7, 22, 0)),  # Wed (winter) -> Sun 17:00 EST
+        (utc(2024, 1, 8, 22, 0), utc(2024, 1, 7, 22, 0)),  # Mon open itself -> same week
+        (utc(2024, 1, 12, 21, 59), utc(2024, 1, 7, 22, 0)),  # Fri just before the close
+        (utc(2024, 7, 10, 12, 0), utc(2024, 7, 7, 21, 0)),  # summer -> Sun 17:00 EDT (21:00 UTC)
+        (utc(2024, 3, 13, 12, 0), utc(2024, 3, 10, 21, 0)),  # week after the spring-forward change
+    ],
+)
+def test_trading_week_start(instant, expected):
+    assert trading_week_start(instant) == expected
+    assert bucket_start(instant, W1) == expected
+    assert is_aligned(expected, W1)
+
+
+def test_dst_week_bucket_is_seven_days_minus_one_hour():
+    # The week whose terminal Sunday springs forward is 7d - 1h long in UTC (never sized by duration).
+    ws = trading_week_start(utc(2024, 3, 5, 12, 0))
+    assert next_bucket_start(ws, W1) - ws == timedelta(days=7) - timedelta(hours=1)
+
+
+def _week_of_d1(start, count, now=None):
+    """H1 -> D1 for `count` H1 bars from `start`, ready to feed aggregate_weekly."""
+    raw = consecutive_bars(start, count, tf=H1)
+    now = now or raw[-1].open_time + timedelta(hours=1, seconds=30)
+    s = build_series(raw, symbol="XAUUSD", timeframe=H1, source="t", asset_class=AssetClass.METAL, now=now)
+    d1, _ = aggregate(s.candles, H1, D1, AssetClass.METAL, now)
+    return d1, now
+
+
+def test_weekly_aggregation_full_week_is_closed():
+    # Two+ full metals weeks of H1 from the Sunday open, so the first week is complete and closed.
+    d1, now = _week_of_d1(utc(2024, 1, 7, 22, 0), 300)
+    weeks, issues = aggregate_weekly(d1, AssetClass.METAL, now)
+    first = weeks[0]
+    members = [c for c in d1 if trading_week_start(c.open_time) == first.open_time]
+    assert first.open_time == utc(2024, 1, 7, 22, 0)
+    assert first.close_time == utc(2024, 1, 14, 22, 0)
+    assert first.is_closed
+    assert first.open == members[0].open and first.close == members[-1].close
+    assert first.high == max(c.high for c in members) and first.low == min(c.low for c in members)
+    assert not any(i.at == first.open_time for i in issues)
+
+
+def test_weekly_incomplete_week_flags_and_not_closed():
+    d1, now = _week_of_d1(utc(2024, 1, 7, 22, 0), 300)
+    first_open = utc(2024, 1, 7, 22, 0)
+    # Drop the Wednesday trading day (Tue 17:00 EST start) from the first week.
+    pruned = [c for c in d1 if c.open_time != utc(2024, 1, 9, 22, 0)]
+    weeks, issues = aggregate_weekly(pruned, AssetClass.METAL, now)
+    first = next(w for w in weeks if w.open_time == first_open)
+    assert first.is_closed is False
+    assert [i.code for i in issues if i.at == first_open] == [C.INCOMPLETE_BUCKET]
+
+
+def test_weekly_forming_week_is_not_closed():
+    # Only two trading days in so far -> the current week cannot be closed and is not flagged incomplete.
+    d1, now = _week_of_d1(utc(2024, 1, 7, 22, 0), 40)
+    weeks, issues = aggregate_weekly(d1, AssetClass.METAL, now)
+    assert weeks[-1].is_closed is False
+    assert not any(i.at == weeks[-1].open_time for i in issues)
+
+
+def test_weekly_bucket_across_spring_forward_is_seven_days_minus_one_hour():
+    # The week Sun 2024-03-03 17:00 EST -> Sun 2024-03-10 17:00 EDT is 7d-1h in UTC. The W1 candle
+    # must build (the Candle validator allows the variable weekly length).
+    d1, now = _week_of_d1(utc(2024, 3, 3, 22, 0), 300)
+    weeks, _ = aggregate_weekly(d1, AssetClass.METAL, now)
+    dst_week = next(w for w in weeks if w.open_time == utc(2024, 3, 3, 22, 0))
+    assert dst_week.close_time == utc(2024, 3, 10, 21, 0)
+    assert dst_week.close_time - dst_week.open_time == timedelta(days=7) - timedelta(hours=1)
+    assert dst_week.is_closed

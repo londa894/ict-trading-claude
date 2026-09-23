@@ -11,6 +11,7 @@ from app.domain.enums import (
     AnalysisIneligibility,
     DataQuality,
     DolConfidence,
+    LiquidityEligibility,
     LiquidityEventType,
     LiquidityPoolType,
     LiquidityScope,
@@ -50,6 +51,7 @@ class LiquidityConfig:
     dol_moderate_margin: float
     dol_low_margin: float
     dol_distinct_price_atr: float
+    trend_aligned_targeting: bool  # section 5: exclude counter-trend external pools from continuation DOL
     qualifier_lookback_bars: int
     atr_period: int
 
@@ -83,6 +85,7 @@ class LiquidityConfig:
             dol_moderate_margin=float(s["dol"]["moderateMargin"]),
             dol_low_margin=float(s["dol"]["lowMargin"]),
             dol_distinct_price_atr=float(s["dol"]["distinctPriceAtr"]),
+            trend_aligned_targeting=bool(s["dol"].get("trendAlignedTargeting", True)),
             qualifier_lookback_bars=int(s["qualifierLookbackBars"]),
             atr_period=int(load_spec("structure")["atrPeriod"]),
         )
@@ -142,6 +145,7 @@ class DolSelection(ApiModel):
     primary: DolTarget | None
     secondary: DolTarget | None
     confidence: DolConfidence
+    eligibility: LiquidityEligibility  # which trend-aligned-targeting regime produced this selection
     margin: float | None
     reason: str
 

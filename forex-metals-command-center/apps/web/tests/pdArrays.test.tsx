@@ -71,7 +71,7 @@ function analysis(over: Partial<PdArrayAnalysis> = {}): PdArrayAnalysis {
     ],
     events: [{ id: "e", zoneId: "FVG:BULLISH:a", zoneType: "FVG", direction: "BULLISH", type: "CREATED", time: T(10), price: 2030.5, detail: "" }],
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: T(31),
     ...over,
   };
@@ -145,7 +145,7 @@ describe("loadPdArrays", () => {
 
 describe("PD_ARRAYS tab", () => {
   const decision = {
-    ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T(31)), "0.19.0-phase19"),
+    ...unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T(31)), "0.20.0-phase20"),
     displacement: "M15 BULLISH STRONG displacement 2.2 ATR over 1 candle(s) (2024-01-09T10:05:00+00:00)",
   };
 

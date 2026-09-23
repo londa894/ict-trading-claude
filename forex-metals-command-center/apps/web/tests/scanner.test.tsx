@@ -46,7 +46,7 @@ function scan(rows: ScanRow[], over: Partial<ScanResponse> = {}): ScanResponse {
   return {
     rows: rows.map((r, i) => ({ ...r, rank: i + 1 })), requestedSymbols: rows.map((r) => r.symbol), minScore: null, onlySetups: false,
     ranking: ["usable data first (verdict not UNAVAILABLE)"], cacheSeconds: 60, durationMs: 1500, verdictAuthority: "FAIL_SAFE_ONLY",
-    authority: "NOT_AUTHORIZED", strategyVersion: "0.19.0-phase19", scannedAt: T, ...over,
+    authority: "NOT_AUTHORIZED", strategyVersion: "0.20.0-phase20", scannedAt: T, ...over,
   };
 }
 
@@ -192,7 +192,7 @@ describe("page symbol switching", () => {
       liquidityEvent: null, structureEvent: null, displacement: null, pdArray: null, noWickState: null, sessionState: null, macroState: null,
       entryZone: null, preferredEntry: null, stop: null, tp1: null, tp2: null, tp3: null, rr: null, riskStatus: "NOT_CONFIGURED",
       blockers: symbol === "XAUUSD" ? ["ANALYSIS_GATES_NOT_IMPLEMENTED"] : ["MARKET_NOT_VALIDATED", "ANALYSIS_GATES_NOT_IMPLEMENTED"],
-      nextRequiredEvent: "x", invalidation: null, dataQuality: "CURRENT", strategyVersion: "0.19.0-phase19", updatedAt: T,
+      nextRequiredEvent: "x", invalidation: null, dataQuality: "CURRENT", strategyVersion: "0.20.0-phase20", updatedAt: T,
     });
     vi.stubGlobal("fetch", vi.fn(async (input: string) => {
       const url = String(input);

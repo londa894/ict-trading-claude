@@ -194,8 +194,9 @@ export interface SystemStatus {
   primaryMarket: string;
 }
 
-/** Timeframes the chart shell serves (Phase 1). H4/D1 are New York 17:00 buckets derived from H1. */
-export const CHART_TIMEFRAMES = ["M5", "M15", "H1", "H4", "D1"] as const satisfies readonly Timeframe[];
+/** Timeframes the chart shell serves. H4/D1 are New York 17:00 buckets derived from H1; W1 is the
+ * Sunday-17:00 New York trading week derived H1 -> D1 -> W1. M1/M30 are native provider resolutions. */
+export const CHART_TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"] as const satisfies readonly Timeframe[];
 export type ChartTimeframe = (typeof CHART_TIMEFRAMES)[number];
 
 export interface ChartCandle {
@@ -383,6 +384,8 @@ export const LIQUIDITY_EVENT_TYPES = ["TOUCH", "SWEEP", "BREAK", "RUN", "RECLAIM
 export type LiquidityEventType = (typeof LIQUIDITY_EVENT_TYPES)[number];
 export const DOL_CONFIDENCES = ["HIGH", "MODERATE", "LOW", "UNCLEAR"] as const;
 export type DolConfidence = (typeof DOL_CONFIDENCES)[number];
+export const LIQUIDITY_ELIGIBILITIES = ["EXTERNAL_TREND_ALIGNED", "INTERNAL_ONLY", "UNRESTRICTED", "REVERSAL_EXEMPT"] as const;
+export type LiquidityEligibility = (typeof LIQUIDITY_ELIGIBILITIES)[number];
 
 /** Keyed exactly like strategy-spec/enums.json (Phase 3 additions). */
 export const LIQUIDITY_CONTRACT_ENUMS = {
@@ -392,6 +395,7 @@ export const LIQUIDITY_CONTRACT_ENUMS = {
   LiquidityState: LIQUIDITY_STATES,
   LiquidityEventType: LIQUIDITY_EVENT_TYPES,
   DolConfidence: DOL_CONFIDENCES,
+  LiquidityEligibility: LIQUIDITY_ELIGIBILITIES,
 } as const;
 
 export interface LiquidityPool {
@@ -440,6 +444,8 @@ export interface DolSelection {
   primary: DolTarget | null;
   secondary: DolTarget | null;
   confidence: DolConfidence;
+  /** Which trend-aligned-targeting regime produced this selection (reversal spec section 5). */
+  eligibility: LiquidityEligibility;
   margin: number | null;
   reason: string;
 }
@@ -466,7 +472,7 @@ export interface LiquidityAnalysis {
 
 export const DISPLACEMENT_GRADES = ["WEAK", "MODERATE", "STRONG", "EXCEPTIONAL"] as const;
 export type DisplacementGrade = (typeof DISPLACEMENT_GRADES)[number];
-export const PD_ARRAY_TYPES = ["FVG", "IFVG"] as const;
+export const PD_ARRAY_TYPES = ["FVG", "IFVG", "IMR", "REVERSAL_FVG"] as const;
 export type PdArrayType = (typeof PD_ARRAY_TYPES)[number];
 export const PD_ARRAY_STATES = ["FRESH", "TOUCHED", "PARTIAL", "HALF", "FULL", "INVALIDATED"] as const;
 export type PdArrayState = (typeof PD_ARRAY_STATES)[number];
@@ -482,6 +488,8 @@ export const PD_ARRAY_EVENT_TYPES = [
   "IFVG_POTENTIAL",
   "IFVG_CONFIRMED",
   "IFVG_FAILED",
+  "IMR_CREATED",
+  "REVERSAL_FVG_CREATED",
 ] as const;
 export type PdArrayEventType = (typeof PD_ARRAY_EVENT_TYPES)[number];
 
@@ -578,6 +586,8 @@ export const NO_WICK_CLASSIFICATIONS = [
 export type NoWickClassification = (typeof NO_WICK_CLASSIFICATIONS)[number];
 export const NO_WICK_STRENGTHS = ["INSIGNIFICANT", "MEANINGFUL", "STRONG", "EXCEPTIONAL"] as const;
 export type NoWickStrength = (typeof NO_WICK_STRENGTHS)[number];
+export const NO_WICK_VARIANTS = ["LATE_CANDLE_FADE", "EARLY_CANDLE_CONTINUATION"] as const;
+export type NoWickVariant = (typeof NO_WICK_VARIANTS)[number];
 export const NO_WICK_ZONE_STATES = [
   "FRESH",
   "APPROACHING",
@@ -618,6 +628,7 @@ export type ScoreComponentStatus = (typeof SCORE_COMPONENT_STATUSES)[number];
 export const NO_WICK_CONTRACT_ENUMS = {
   NoWickClassification: NO_WICK_CLASSIFICATIONS,
   NoWickStrength: NO_WICK_STRENGTHS,
+  NoWickVariant: NO_WICK_VARIANTS,
   NoWickZoneState: NO_WICK_ZONE_STATES,
   NoWickZoneEventType: NO_WICK_ZONE_EVENT_TYPES,
   NoWickContextFactor: NO_WICK_CONTEXT_FACTORS,
@@ -712,6 +723,39 @@ export interface NoWickZoneEvent {
   detail: string;
 }
 
+/** The live, not-yet-closed bar with how far through its bucket it is. Read-only context for the
+ * reversal playbook's LATE_CANDLE_FADE / EARLY_CANDLE_CONTINUATION variants — never authorizes a
+ * verdict (the decision engine stays closed-bar). Ratios are null when the range is zero. */
+export interface FormingCandle {
+  timeframe: Timeframe;
+  openTime: string;
+  closeTime: string;
+  /** Clock at which this snapshot was taken. */
+  asOf: string;
+  /** 0..100, wall-clock elapsed through the bucket. */
+  maturityPct: number;
+  /** BULLISH close>open, BEARISH close<open, null when flat. */
+  direction: Direction | null;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  range: number;
+  body: number;
+  upperWick: number;
+  lowerWick: number;
+  bodyPct: number | null;
+  upperWickPct: number | null;
+  lowerWickPct: number | null;
+  closeLocationPct: number | null;
+  /** Section-1 no-wick variant on the live candle; null when neither applies. Confluence only. */
+  variant: NoWickVariant | null;
+  /** Fade / continuation direction of the variant. */
+  signalDirection: Direction | null;
+  /** Origin-timeframe directional-quality weight (0 when the timeframe is not weighted). */
+  originWeight: number;
+}
+
 export interface NoWickAnalysis {
   symbol: string;
   timeframe: Timeframe;
@@ -725,6 +769,8 @@ export interface NoWickAnalysis {
   events: NoWickEvent[];
   zones: NoWickZone[];
   zoneEvents: NoWickZoneEvent[];
+  /** The live bar (context only); null when the last bar is closed. */
+  forming: FormingCandle | null;
   providerError: string | null;
   strategyVersion: string;
   generatedAt: string;
@@ -851,6 +897,21 @@ export interface JudasSwing {
   detail: string;
 }
 
+/** Elevated-confidence multi-session sweep (spec section 5): London failed to take Asia's level, then
+ * one New York candle swept BOTH in one move. Read-only session context; never a trade. */
+export interface SessionSweepConfluence {
+  id: string;
+  tradingDay: string;
+  session: SessionName;
+  /** SSL = both session lows swept, BSL = both session highs swept. */
+  side: LiquiditySide;
+  asiaLevel: number;
+  londonLevel: number;
+  sweepTime: string;
+  sweepExtreme: number;
+  detail: string;
+}
+
 export interface SessionAnalysis {
   symbol: string;
   sourceTimeframe: Timeframe;
@@ -867,6 +928,7 @@ export interface SessionAnalysis {
   previousSession: PreviousSession | null;
   adr: AdrState | null;
   judas: JudasSwing[];
+  sweepConfluence: SessionSweepConfluence[];
   providerError: string | null;
   strategyVersion: string;
   generatedAt: string;
@@ -889,10 +951,14 @@ export interface SessionDecisionState {
 
 // --- Phase 7: setup state machine --------------------------------------------------------------
 
-export const SETUP_STATES = ["DISCOVERED", "WATCH", "SETUP_FORMING", "LIQUIDITY_EVENT", "WAITING_FOR_MSS", "SETUP_ARMED", "WAITING_FOR_RETRACEMENT", "ENTRY_ZONE_APPROACHING", "ENTRY_ZONE_TOUCHED", "WAITING_FOR_CONFIRMATION", "LONG_READY", "SHORT_READY", "ENTRY_MISSED", "INVALIDATED", "EXPIRED", "BLOCKED", "ACTIVE", "CLOSED"] as const;
+export const SETUP_STATES = ["DISCOVERED", "WATCH", "SETUP_FORMING", "LIQUIDITY_EVENT", "WAITING_FOR_MSS", "REBALANCE_WATCH", "REBALANCE_TOUCH", "REACTION", "CONFIRMATION", "SETUP_ARMED", "WAITING_FOR_RETRACEMENT", "ENTRY_ZONE_APPROACHING", "ENTRY_ZONE_TOUCHED", "WAITING_FOR_CONFIRMATION", "LONG_READY", "SHORT_READY", "ENTRY_MISSED", "INVALIDATED", "EXPIRED", "BLOCKED", "ACTIVE", "CLOSED"] as const;
 export type SetupState = (typeof SETUP_STATES)[number];
-export const SETUP_TYPES = ["LIQUIDITY_SWEEP_MSS"] as const;
+export const SETUP_TYPES = ["LIQUIDITY_SWEEP_MSS", "REVERSAL_NO_WICK_IFVG"] as const;
 export type SetupType = (typeof SETUP_TYPES)[number];
+export const REVERSAL_ORIGIN_KINDS = ["NO_WICK", "IMR"] as const;
+export type ReversalOriginKind = (typeof REVERSAL_ORIGIN_KINDS)[number];
+export const REVERSAL_CONFIRMATIONS = ["IFVG_FLIP", "NEW_FVG", "IMR"] as const;
+export type ReversalConfirmation = (typeof REVERSAL_CONFIRMATIONS)[number];
 export const SETUP_STEPS = ["HTF_BIAS", "DOL_TARGET", "LIQUIDITY_EVENT", "DISPLACEMENT", "MSS", "PD_ARRAY", "RETRACEMENT", "LTF_CONFIRMATION", "RISK"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 export const SETUP_STEP_STATUSES = ["DONE", "PENDING", "NOT_EVALUATED"] as const;
@@ -904,10 +970,82 @@ export type Po3Phase = (typeof PO3_PHASES)[number];
 export const SETUP_CONTRACT_ENUMS = {
   SetupState: SETUP_STATES,
   SetupType: SETUP_TYPES,
+  ReversalOriginKind: REVERSAL_ORIGIN_KINDS,
+  ReversalConfirmation: REVERSAL_CONFIRMATIONS,
   SetupStep: SETUP_STEPS,
   SetupStepStatus: SETUP_STEP_STATUSES,
   Po3Phase: PO3_PHASES,
 } as const;
+
+// --- REVERSAL_NO_WICK_IFVG (counter-bias reversal setup). Read-only; `enabled` gates the live verdict. ---
+export interface OriginZone {
+  id: string;
+  kind: ReversalOriginKind;
+  timeframe: Timeframe;
+  direction: Direction;
+  bodyTop: number;
+  bodyBottom: number;
+  farEdge: number;
+  weight: number;
+  knownAt: string;
+}
+
+export interface ReversalEvent {
+  id: string;
+  setupId: string;
+  direction: Direction;
+  state: SetupState;
+  time: string;
+  price: number;
+  detail: string;
+}
+
+export interface ReversalSetup {
+  id: string;
+  setupType: SetupType;
+  direction: Direction;
+  state: SetupState;
+  terminal: boolean;
+  tradingDay: string;
+  origin: OriginZone;
+  discoveredAt: string;
+  stateChangedAt: string;
+  rebalancedAt: string | null;
+  reactionAt: string | null;
+  armedAt: string | null;
+  confirmations: ReversalConfirmation[];
+  confirmingZoneIds: string[];
+  protectiveLevel: number | null;
+  entryPrice: number | null;
+  entryZoneId: string | null;
+  stopPrice: number | null;
+  targetPrice: number | null;
+  targetPoolId: string | null;
+  targetLabel: string | null;
+  rr: number | null;
+  reason: string | null;
+}
+
+export interface ReversalAnalysis {
+  symbol: string;
+  timeframe: Timeframe;
+  asOf: string | null;
+  candleCount: number;
+  quality: DataQuality;
+  isSynthetic: boolean;
+  /** A/B flag: when false the reversal setup never reaches the live verdict. */
+  enabled: boolean;
+  eligibleForDecision: boolean;
+  ineligibility: AnalysisIneligibility[];
+  bias: HtfBias;
+  originCount: number;
+  current: ReversalSetup | null;
+  setups: ReversalSetup[];
+  events: ReversalEvent[];
+  providerError: string | null;
+  strategyVersion: string;
+  generatedAt: string;
+}
 
 export interface BiasPoint {
   timeframe: Timeframe;

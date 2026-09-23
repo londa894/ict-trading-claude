@@ -34,9 +34,9 @@ function sim(over: Partial<PaperSim> = {}): PaperSim {
       engineAuthorization: "NOT_AUTHORIZED", executionTimeframe: "M5", htfBias: null, primaryDol: null, liquidityEvent: null, structureEvent: null,
       displacement: null, pdArray: null, noWick: null, newsState: null, macroBias: null, macroState: null, setupType: null, setupState: null,
       setupScore: null, setupGrade: null, confidence: null, planEntry: null, planStop: null, planTargets: [], planRr: null, riskStatus: null,
-      blockers: [], isSynthetic: false, strategyVersion: "0.19.0-phase19",
+      blockers: [], isSynthetic: false, strategyVersion: "0.20.0-phase20",
     },
-    integrity: "VERIFIED", notes: "", authority: "SIMULATION_ONLY", strategyVersion: "0.19.0-phase19", ...over,
+    integrity: "VERIFIED", notes: "", authority: "SIMULATION_ONLY", strategyVersion: "0.20.0-phase20", ...over,
   };
 }
 

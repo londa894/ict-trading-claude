@@ -30,8 +30,9 @@ def _cfg(flag: bool) -> SetupConfig:
     return dataclasses.replace(SetupConfig.from_spec(), confirm_before_chase_guard=flag)
 
 
-def test_flag_is_off_by_default():
-    assert SetupConfig.from_spec().confirm_before_chase_guard is False
+def test_flag_is_enabled_in_the_shipped_spec():
+    # Enabled in setup.json as of the Playbook Revamp: confirmation is checked before the chase guard.
+    assert SetupConfig.from_spec().confirm_before_chase_guard is True
 
 
 def test_legacy_target_take_on_confirm_candle_kills_the_setup():

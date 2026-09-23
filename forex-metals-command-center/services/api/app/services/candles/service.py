@@ -23,21 +23,34 @@ from app.domain.issues import ValidationIssue
 from app.providers.base import MarketDataProvider, ProviderError
 from app.services.candles.normalize import build_series
 from app.services.data_quality.market_hours import market_status_at
-from app.services.timeframes.aggregate import aggregate
+from app.services.timeframes.aggregate import aggregate, aggregate_weekly
 
 logger = logging.getLogger("fmcc.candles")
 
 CHART_TIMEFRAMES: tuple[Timeframe, ...] = (
+    Timeframe.M1,
     Timeframe.M5,
     Timeframe.M15,
+    Timeframe.M30,
     Timeframe.H1,
     Timeframe.H4,
     Timeframe.D1,
+    Timeframe.W1,
 )
-DERIVED_FROM: dict[Timeframe, Timeframe] = {Timeframe.H4: Timeframe.H1, Timeframe.D1: Timeframe.H1}
+# Higher timeframes are derived from validated H1 (deterministic, vendor-independent). W1 is a
+# second hop: H1 -> D1 -> W1, so its source fetch and bar-count math are sized off H1.
+DERIVED_FROM: dict[Timeframe, Timeframe] = {
+    Timeframe.H4: Timeframe.H1,
+    Timeframe.D1: Timeframe.H1,
+    Timeframe.W1: Timeframe.H1,
+}
 MAX_LIMIT = 1000
 DEFAULT_LIMIT = 300
 WARMUP_BARS = 25  # >= spike-detection lookback, so the oldest returned candles are judged too
+# W1 is derived H1 -> D1 -> W1, so N weeks costs ~N*168 source H1 bars. Providers cap a single
+# history request (TradeLocker ~11.6k H1 bars), so the weekly window is clamped to what fits; 64
+# weeks (~10.9k H1) yields >50 closed weekly candles, clearing the structure minCandles gate.
+_MAX_W1_LIMIT = 64
 _WITHHELD = frozenset({DataQuality.INVALID, DataQuality.DISCONNECTED})
 
 
@@ -128,6 +141,8 @@ class CandleService:
             raise UnknownSymbolError(symbol)
 
         now = now or self._clock()
+        if timeframe is Timeframe.W1:
+            limit = min(limit, _MAX_W1_LIMIT)  # bounded by the provider's single-request H1 ceiling
         source_tf = DERIVED_FROM.get(timeframe, timeframe)
         candles: list[Candle] = []
         issues: list[ValidationIssue] = []
@@ -153,9 +168,17 @@ class CandleService:
                 )
                 quality, issues, candles = series.quality, list(series.issues), list(series.candles)
                 if source_tf is not timeframe and quality not in _WITHHELD:
-                    derived, agg_issues = aggregate(
-                        candles, source_tf, timeframe, instrument.asset_class, now
-                    )
+                    if timeframe is Timeframe.W1:
+                        # H1 -> D1 -> W1: the weekly candle groups New York trading days.
+                        d1, d1_issues = aggregate(
+                            candles, source_tf, Timeframe.D1, instrument.asset_class, now
+                        )
+                        derived, wk_issues = aggregate_weekly(d1, instrument.asset_class, now)
+                        agg_issues = [*d1_issues, *wk_issues]
+                    else:
+                        derived, agg_issues = aggregate(
+                            candles, source_tf, timeframe, instrument.asset_class, now
+                        )
                     if len(derived) > 1:
                         edge = derived[0].open_time
                         derived = derived[1:]

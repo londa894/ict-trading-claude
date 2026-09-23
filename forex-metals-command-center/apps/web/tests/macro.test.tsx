@@ -37,7 +37,7 @@ function macro(over: Partial<MacroAssessment> = {}): MacroAssessment {
     reason: null,
     warnings: ["US10Y used instead of US10Y_REAL"],
     thresholds: { supportive: 0.2, stronglySupportive: 0.6 },
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: T,
     ...over,
   };
@@ -102,7 +102,7 @@ function evaluation(over: Partial<DecisionEvaluation> = {}): DecisionEvaluation 
     components: [{ factor: "MACRO", status: "EVALUATED", points: 5, maxPoints: 5, detail: "macro STRONGLY_SUPPORTIVE" }],
     adjustments: [], hardBlockers: [], missingGates: ["RISK_GATE_MISSING", "NEWS_GATE_MISSING"], warnings: [],
     evidenceFor: [], evidenceAgainst: [], devilsAdvocate: [], plan: null, risk: null, news: null, macro: macro(),
-    authority: "NOT_AUTHORIZED", strategyVersion: "0.19.0-phase19", generatedAt: T, ...over,
+    authority: "NOT_AUTHORIZED", strategyVersion: "0.20.0-phase20", generatedAt: T, ...over,
   };
 }
 

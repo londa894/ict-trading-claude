@@ -25,7 +25,7 @@ function alert(seq: number, over: Partial<Alert> = {}): Alert {
   return {
     id: `ALERT:${seq}`, seq, dedupeKey: `XAUUSD:LIQUIDITY_SWEEP:L${seq}`, symbol: "XAUUSD", type: "LIQUIDITY_SWEEP", category: "WATCH",
     priority: "MEDIUM", title: "XAUUSD SSL SWING_LOW SWEEP", message: "SWING_LOW @ 2040.21, close 2040.61", direction: null, price: 2040.21,
-    occurredAt: T, createdAt: T, strategyVersion: "0.19.0-phase19", ...over,
+    occurredAt: T, createdAt: T, strategyVersion: "0.20.0-phase20", ...over,
   };
 }
 

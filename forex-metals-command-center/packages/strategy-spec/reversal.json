@@ -1,0 +1,32 @@
+{
+  "$comment": "REVERSAL_NO_WICK_IFVG setup (reversal spec section 6). Counter-bias: HTF no-wick/IMR origin -> rebalance -> reaction -> confirmation -> arm. Research defaults; any change must bump strategyVersion. No fixed probabilities.",
+  "origin": {
+    "timeframes": ["D1", "H4", "H1"],
+    "weights": {"D1": 1.0, "H4": 0.7, "H1": 0.5},
+    "minBodyPct": 0.5,
+    "maxWickPct": 0.05
+  },
+  "biasGate": {
+    "$comment": "Allow the counter-bias reversal only when a D1 origin outranks the bias, or the HTF bias is non-directional.",
+    "alwaysAllowedOriginTimeframes": ["D1"],
+    "allowedBiases": ["RANGING", "TRANSITIONING", "MIXED", "UNCLEAR"]
+  },
+  "rebalance": {
+    "windowBars": 96
+  },
+  "reaction": {
+    "windowBars": 8,
+    "wickPct": 0.4,
+    "displacementMinGrade": "MODERATE"
+  },
+  "confirmation": {
+    "$comment": "After the reaction, any ONE of IFVG_FLIP (confirmed IFVG at the origin) / NEW_FVG / IMR (from the reversal leg, in the reversal direction) arms the setup within flipWindowBars.",
+    "flipWindowBars": 12
+  },
+  "entry": {
+    "$comment": "After ARM, price must retest the entry zone within windowBars; if the target is reached first the setup is ENTRY_MISSED (do not chase).",
+    "windowBars": 24
+  },
+  "stopBufferAtr": 0.25,
+  "enabled": false
+}

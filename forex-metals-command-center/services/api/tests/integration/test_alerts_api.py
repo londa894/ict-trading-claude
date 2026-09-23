@@ -182,7 +182,7 @@ async def test_ready_watch_fires_once_when_the_decision_is_directional_with_full
     svc._market_state.evaluate = directional  # type: ignore[method-assign]
     from app.services.alerts import service as alert_service
 
-    monkeypatch.setattr(alert_service, "load_spec", lambda _name: {"verdictAuthority": "FULL"})
+    monkeypatch.setattr(alert_service, "verdict_authority", lambda: "FULL")
     await svc.cycle(force=True)
     await svc.cycle(force=True)
     ready = [a for a in svc.store.list() if a.type is AlertType.READY]

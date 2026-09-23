@@ -45,7 +45,8 @@
     "highMargin": 25,
     "moderateMargin": 15,
     "lowMargin": 8,
-    "distinctPriceAtr": 0.25
+    "distinctPriceAtr": 0.25,
+    "trendAlignedTargeting": true
   },
   "qualifierLookbackBars": 20,
   "decisionContext": {

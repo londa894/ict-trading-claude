@@ -21,8 +21,9 @@ class FakePool:
         self.price = price
 
 
-def test_default_config_has_no_floor_so_behaviour_is_unchanged():
-    assert SetupConfig.from_spec().min_target_atr == 0.0
+def test_shipped_config_has_a_one_atr_target_floor():
+    # Set in setup.json as of the Playbook Revamp: targets must be at least 1 ATR away.
+    assert SetupConfig.from_spec().min_target_atr == 1.0
 
 
 def test_no_floor_keeps_every_candidate():

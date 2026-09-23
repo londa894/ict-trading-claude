@@ -314,3 +314,117 @@ def test_approaching_is_derived_for_the_as_of_view(last, state):
     candles, result = run([*BASE, SOURCE, last])
     zone = next(z for z in result.zones if z.id == event_at(result, candles, 14).zone_id)
     assert zone.state is state and zone.active and zone_sequence(result, zone.id) == []
+
+
+# --- Forming candle (Step 5: LATE_CANDLE_FADE groundwork) -----------------------------------------
+from datetime import UTC, datetime, timedelta  # noqa: E402
+
+from app.domain.candle import Candle  # noqa: E402
+from app.domain.enums import DataQuality, NoWickVariant, Timeframe  # noqa: E402
+from app.services.no_wick.features import build_forming_candle  # noqa: E402
+
+
+def _bar(open_time, o, h, low, c, *, tf=Timeframe.M15, closed=True):
+    return Candle(
+        symbol="XAUUSD",
+        timeframe=tf,
+        open_time=open_time,
+        close_time=open_time + tf.duration,
+        open=o,
+        high=h,
+        low=low,
+        close=c,
+        volume=1.0,
+        source="t",
+        is_closed=closed,
+        data_quality=DataQuality.CURRENT,
+    )
+
+
+def test_forming_candle_geometry_and_maturity():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    live_open = t0 + timedelta(minutes=15)
+    live = _bar(live_open, 10.5, 12.0, 10.0, 11.7, closed=False)  # range 2.0, body 1.2, upper 0.3, lower 0.5
+    now = live_open + timedelta(minutes=9)  # 9/15 = 60% through the M15 bucket
+    fc = build_forming_candle(Timeframe.M15, [_bar(t0, 10, 11, 9, 10.5), live], now, CFG)
+    assert fc is not None
+    assert fc.maturity_pct == pytest.approx(60.0)
+    assert fc.direction is Direction.BULLISH
+    assert (fc.open, fc.high, fc.low, fc.close) == (10.5, 12.0, 10.0, 11.7)
+    assert fc.range == pytest.approx(2.0) and fc.body == pytest.approx(1.2)
+    assert fc.upper_wick == pytest.approx(0.3) and fc.lower_wick == pytest.approx(0.5)
+    assert fc.body_pct == pytest.approx(0.6)
+    assert fc.close_location_pct == pytest.approx((11.7 - 10.0) / 2.0 * 100)
+
+
+def test_forming_candle_none_when_last_closed_or_empty():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    assert (
+        build_forming_candle(Timeframe.M15, [_bar(t0, 10, 11, 9, 10.5)], t0 + timedelta(hours=1), CFG) is None
+    )
+    assert build_forming_candle(Timeframe.M15, [], t0, CFG) is None
+
+
+def test_forming_candle_flat_bar_has_no_direction_and_null_ratios():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    fc = build_forming_candle(
+        Timeframe.M15, [_bar(t0, 10.0, 10.0, 10.0, 10.0, closed=False)], t0 + timedelta(minutes=3), CFG
+    )
+    assert fc is not None
+    assert fc.direction is None and fc.body_pct is None and fc.close_location_pct is None
+    assert fc.maturity_pct == pytest.approx(20.0)
+
+
+def test_forming_candle_maturity_clamped_to_100_when_overdue():
+    # A late/overdue clock (bar should have closed) never reports past 100%.
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    fc = build_forming_candle(
+        Timeframe.M15, [_bar(t0, 10, 11, 9, 10.5, closed=False)], t0 + timedelta(hours=2), CFG
+    )
+    assert fc is not None and fc.maturity_pct == 100.0
+
+
+# --- No-wick variants (Phase C, spec section 1) ---------------------------------------------------
+
+
+def test_late_candle_fade_bullish_no_lower_wick_fades_down():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    # 80% mature bullish bar, no lower wick (missing) -> fade toward the missing lower wick = BEARISH.
+    bar = _bar(t0, 10.0, 11.9, 10.0, 11.8, closed=False)  # range 1.9, body 1.8, lower 0.0, upper 0.1
+    fc = build_forming_candle(Timeframe.M15, [bar], t0 + timedelta(minutes=12), CFG)
+    assert fc.variant is NoWickVariant.LATE_CANDLE_FADE
+    assert fc.signal_direction is Direction.BEARISH
+    assert fc.origin_weight == pytest.approx(0.2)  # M15 weight from spec
+
+
+def test_late_candle_fade_bearish_no_upper_wick_fades_up():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    # 80% mature bearish bar, no upper wick -> fade up toward the missing upper wick = BULLISH.
+    bar = _bar(t0, 11.9, 11.9, 10.0, 10.1, closed=False)  # range 1.9, body 1.8, upper 0.0, lower 0.1
+    fc = build_forming_candle(Timeframe.D1, [bar], t0 + timedelta(hours=20), CFG)
+    assert fc.variant is NoWickVariant.LATE_CANDLE_FADE and fc.signal_direction is Direction.BULLISH
+    assert fc.origin_weight == pytest.approx(1.0)  # D1 weighted highest
+
+
+def test_early_candle_continuation_keeps_body_direction():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    # 20% mature bullish bar with a trailing (lower) wick already formed -> continuation, not invalidation.
+    bar = _bar(t0, 10.3, 11.0, 10.0, 10.9, closed=False)  # range 1.0, body 0.6, lower 0.3, upper 0.1
+    fc = build_forming_candle(Timeframe.M15, [bar], t0 + timedelta(minutes=3), CFG)
+    assert fc.variant is NoWickVariant.EARLY_CANDLE_CONTINUATION
+    assert fc.signal_direction is Direction.BULLISH
+
+
+def test_no_variant_mid_life():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    bar = _bar(t0, 10.0, 11.9, 10.0, 11.8, closed=False)
+    fc = build_forming_candle(Timeframe.M15, [bar], t0 + timedelta(minutes=8), CFG)  # ~53% mature
+    assert fc.variant is None and fc.signal_direction is None
+
+
+def test_late_marubozu_fades_against_the_body():
+    t0 = datetime(2024, 1, 9, 10, 0, tzinfo=UTC)
+    # 80% mature bullish marubozu (no wick either side) -> fade back toward the origin = BEARISH.
+    bar = _bar(t0, 10.0, 11.9, 10.0, 11.9, closed=False)  # lower 0, upper 0, body 1.9
+    fc = build_forming_candle(Timeframe.M15, [bar], t0 + timedelta(minutes=12), CFG)
+    assert fc.variant is NoWickVariant.LATE_CANDLE_FADE and fc.signal_direction is Direction.BEARISH

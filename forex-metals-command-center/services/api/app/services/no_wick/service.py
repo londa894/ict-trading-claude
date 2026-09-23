@@ -14,6 +14,10 @@ from app.services.pd_arrays.models import PdArrayConfig
 from app.services.structure.models import StructureConfig
 
 DEFAULT_LIMIT = 300
+# HTF bar counts are sized per timeframe: a weekly candle is derived H1 -> D1 -> W1, so a large
+# W1 limit would demand tens of thousands of H1 bars. 64 weeks (the candle service's W1 cap) yields
+# >50 closed weekly candles, enough to clear the structure minCandles gate for no-wick context.
+_HTF_LIMITS: dict[Timeframe, int] = {Timeframe.W1: 64}
 
 
 class NoWickService:
@@ -78,7 +82,7 @@ class NoWickService:
         names = load_spec("no_wick")["decisionContext"].get("htfTimeframes", [self._tf.value])
         rows: list[dict[str, object]] = []
         for tf in (Timeframe(t) for t in names):
-            analysis = await self.analyze(symbol, tf)
+            analysis = await self.analyze(symbol, tf, _HTF_LIMITS.get(tf))
             events = list(analysis.events) if analysis.eligible_for_decision else []
             meaningful = [e for e in events if e.strength.rank >= NoWickStrength.MEANINGFUL.rank]
             latest = meaningful[-1] if meaningful else (events[-1] if events else None)
@@ -88,6 +92,11 @@ class NoWickService:
                     "timeframe": tf.value,
                     "eligible": analysis.eligible_for_decision,
                     "meaningfulCount": len(meaningful),
+                    "forming": (
+                        analysis.forming.model_dump(by_alias=True, mode="json")
+                        if analysis.forming is not None
+                        else None
+                    ),
                     "latest": (
                         {
                             "time": latest.time.isoformat(),

@@ -70,7 +70,7 @@ function analysis(over: Partial<StructureAnalysis> = {}): StructureAnalysis {
     external: level("EXTERNAL"),
     events: [],
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: TE(26),
     ...over,
   };

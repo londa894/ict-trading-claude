@@ -101,8 +101,9 @@ function analysis(over: Partial<NoWickAnalysis> = {}): NoWickAnalysis {
       zone({ id: "NWZ:BEARISH:b", eventId: "NW:BEARISH:b", direction: "BEARISH", state: "INVALIDATED", active: false, createdAt: T(15) }),
     ],
     zoneEvents: [{ id: "ze", zoneId: "NWZ:BULLISH:a", direction: "BULLISH", type: "REBALANCE_25", time: T(20), price: 2031.4, detail: "" }],
+    forming: null,
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: T(31),
     ...over,
   };
@@ -176,7 +177,7 @@ describe("loadNoWick", () => {
 });
 
 describe("NO_WICK tab and decision state", () => {
-  const base = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T(31)), "0.19.0-phase19");
+  const base = unavailableDecision("XAUUSD", ["DATA_SYNTHETIC"], "x", new Date(T(31)), "0.20.0-phase20");
   const state = {
     timeframe: "M15", time: T(10), direction: "BULLISH", classification: "TRUE_BULLISH_MARUBOZU", strength: "STRONG",
     candleQualityScore: 90, contextScore: 60, relevanceScore: 78, zoneState: "PARTIAL", authority: "CONTEXT_ONLY",

@@ -73,11 +73,12 @@ function analysis(over: Partial<LiquidityAnalysis> = {}): LiquidityAnalysis {
       primary: { poolId: "EQH:z", type: "EQH", side: "BSL", label: "EQH x2", price: 2033, magnetScore: 70, distanceAtr: 1.5 },
       secondary: { poolId: "PDH:x", type: "PDH", side: "BSL", label: "PDH 2024-01-08", price: 2035, magnetScore: 61.5, distanceAtr: 2.5 },
       confidence: "MODERATE",
+      eligibility: "EXTERNAL_TREND_ALIGNED",
       margin: 30,
       reason: "EQH x2 leads the opposite side by 30 points",
     },
     providerError: null,
-    strategyVersion: "0.19.0-phase19",
+    strategyVersion: "0.20.0-phase20",
     generatedAt: T(31),
     ...over,
   };
@@ -166,7 +167,7 @@ describe("loadLiquidity", () => {
 
 describe("LIQUIDITY tab", () => {
   const decision = {
-    ...unavailableDecision("XAUUSD", ["DOL_UNCLEAR"], "x", new Date(T(31)), "0.19.0-phase19"),
+    ...unavailableDecision("XAUUSD", ["DOL_UNCLEAR"], "x", new Date(T(31)), "0.20.0-phase20"),
     primaryDol: "H1 BSL EQH x2 @ 2033 (magnet 70, 1.5 ATR)",
   };
 

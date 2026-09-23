@@ -5,6 +5,7 @@ import pytest
 
 from app.domain.enums import (
     DolConfidence,
+    LiquidityEligibility,
     LiquidityEventType,
     LiquidityPoolType,
     LiquidityScope,
@@ -103,12 +104,13 @@ def test_magnet_components_and_caps():
     assert magnet_scores(pools, 100.0, 0.0, TrendDirection.NONE, c) == {}
 
 
-def pool(pid, side, price, score, distance, taken=False):
+def pool(pid, side, price, score, distance, taken=False, scope=LiquidityScope.EXTERNAL, ptype=None):
     return LiquidityPool(
         id=pid,
-        type=LiquidityPoolType.SWING_HIGH if side is LiquiditySide.BSL else LiquidityPoolType.SWING_LOW,
+        type=ptype
+        or (LiquidityPoolType.SWING_HIGH if side is LiquiditySide.BSL else LiquidityPoolType.SWING_LOW),
         side=side,
-        scope=LiquidityScope.EXTERNAL,
+        scope=scope,
         label=pid,
         price=price,
         formed_at=utc(2024, 1, 9),
@@ -153,6 +155,93 @@ def test_two_sided_unclear_and_empty_and_zero_atr():
     assert select_dol(two_sided, 0.0, c).primary is None
     one_sided = select_dol([pool("h", LiquiditySide.BSL, 101, 40, 1)], 1.0, c)
     assert one_sided.margin == 40 and one_sided.confidence is DolConfidence.HIGH
+
+
+# --- section 5: trend-aligned targeting -----------------------------------------------------------
+
+
+def test_dol_no_trend_is_unrestricted():
+    c = liq_cfg()
+    pools = [pool("h", LiquiditySide.BSL, 101, 55, 1), pool("l", LiquiditySide.SSL, 99, 90, 1)]
+    dol = select_dol(pools, 1.0, c)  # trend defaults NONE
+    assert dol.eligibility is LiquidityEligibility.UNRESTRICTED
+    assert dol.primary.pool_id == "l"  # highest magnet wins, no filter
+
+
+def test_bullish_excludes_external_lows_and_selects_external_high():
+    c = liq_cfg()
+    # A strong counter-trend external LOW would win on magnet score, but is ineligible when bullish.
+    pools = [
+        pool("ext_high", LiquiditySide.BSL, 110, 60, 3),
+        pool("ext_low", LiquiditySide.SSL, 90, 95, 2),  # external low: not a bullish draw
+    ]
+    dol = select_dol(pools, 1.0, c, TrendDirection.BULLISH)
+    assert dol.primary.pool_id == "ext_high"
+    assert dol.eligibility is LiquidityEligibility.EXTERNAL_TREND_ALIGNED
+
+
+def test_bearish_mirror_excludes_external_highs():
+    c = liq_cfg()
+    pools = [
+        pool("ext_low", LiquiditySide.SSL, 90, 60, 3),
+        pool("ext_high", LiquiditySide.BSL, 110, 95, 2),  # external high: not a bearish draw
+    ]
+    dol = select_dol(pools, 1.0, c, TrendDirection.BEARISH)
+    assert dol.primary.pool_id == "ext_low"
+    assert dol.eligibility is LiquidityEligibility.EXTERNAL_TREND_ALIGNED
+
+
+def test_internal_only_when_no_eligible_external_draw():
+    c = liq_cfg()
+    # Bullish, but the only external pool is a low (ineligible); an internal low remains as pullback draw.
+    pools = [
+        pool("ext_low", LiquiditySide.SSL, 90, 95, 2),
+        pool("int_low", LiquiditySide.SSL, 98, 50, 1, scope=LiquidityScope.INTERNAL),
+    ]
+    dol = select_dol(pools, 1.0, c, TrendDirection.BULLISH)
+    assert dol.primary.pool_id == "int_low"
+    assert dol.eligibility is LiquidityEligibility.INTERNAL_ONLY
+
+
+def test_reversal_exempt_bypasses_the_filter():
+    c = liq_cfg()
+    pools = [
+        pool("ext_high", LiquiditySide.BSL, 110, 60, 3),
+        pool("ext_low", LiquiditySide.SSL, 90, 95, 2),
+    ]
+    # Bullish trend, but a reversal targets the counter-trend external low unrestricted.
+    dol = select_dol(pools, 1.0, c, TrendDirection.BULLISH, reversal_exempt=True)
+    assert dol.primary.pool_id == "ext_low"
+    assert dol.eligibility is LiquidityEligibility.REVERSAL_EXEMPT
+
+
+def test_trend_aligned_targeting_flag_defaults_on():
+    # The reversibility flag (engine passes NONE when disabled -> legacy UNRESTRICTED behavior).
+    assert liq_cfg().trend_aligned_targeting is True
+    pools = [pool("ext_high", LiquiditySide.BSL, 110, 60, 3), pool("ext_low", LiquiditySide.SSL, 90, 95, 2)]
+    assert select_dol(pools, 1.0, liq_cfg(), TrendDirection.BULLISH).primary.pool_id == "ext_high"  # on
+    assert select_dol(pools, 1.0, liq_cfg(), TrendDirection.NONE).primary.pool_id == "ext_low"  # off -> NONE
+
+
+def test_significant_liquidity_tier_breaks_ties_higher_timeframe_wins():
+    c = liq_cfg()
+    # Two eligible BSL draws with equal magnet score: the weekly high (PWH) outranks a session high.
+    pools = [
+        pool("session", LiquiditySide.BSL, 105, 60, 2, ptype=LiquidityPoolType.NY_AM_HIGH),
+        pool("week", LiquiditySide.BSL, 108, 60, 2, ptype=LiquidityPoolType.PWH),
+    ]
+    dol = select_dol(pools, 1.0, c, TrendDirection.BULLISH)
+    assert dol.primary.pool_id == "week"
+
+
+def test_bullish_filter_relaxes_dol_unclear_against_the_trend():
+    c = liq_cfg()
+    # Two-sided external pools: without the filter this is DOL_UNCLEAR; bullish filter removes the
+    # counter-trend low, so the upside draw stands clear.
+    pools = [pool("h", LiquiditySide.BSL, 101, 55, 1), pool("l", LiquiditySide.SSL, 99, 52, 1)]
+    assert select_dol(pools, 1.0, c).confidence is DolConfidence.UNCLEAR
+    aligned = select_dol(pools, 1.0, c, TrendDirection.BULLISH)
+    assert aligned.primary.pool_id == "h" and aligned.confidence is not DolConfidence.UNCLEAR
 
 
 # --- qualifiers ------------------------------------------------------------------------------------

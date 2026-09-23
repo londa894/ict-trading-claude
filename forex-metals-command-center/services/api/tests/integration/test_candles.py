@@ -32,7 +32,8 @@ def fixture_client():
     return client(SyntheticFixtureProvider(), clock=lambda: AFTER_FIXTURE)
 
 
-@pytest.mark.parametrize("tf", [t.value for t in CHART_TIMEFRAMES])
+# M1 is finer than the fixture's M5 base so it cannot be synthesized here (it is covered against real data).
+@pytest.mark.parametrize("tf", [t.value for t in CHART_TIMEFRAMES if t is not Timeframe.M1])
 def test_every_chart_timeframe_serves_aligned_ascending_candles(fixture_client, tf):
     r = get(fixture_client, tf, limit=1000)
     assert r.status_code == 200
@@ -40,7 +41,7 @@ def test_every_chart_timeframe_serves_aligned_ascending_candles(fixture_client, 
     assert body["timeframe"] == tf
     assert body["isSynthetic"] is True
     assert body["quality"] == "CURRENT"
-    assert body["strategyVersion"] == "0.19.0-phase19"
+    assert body["strategyVersion"] == "0.20.0-phase20"
     candles = body["candles"]
     assert 0 < len(candles) <= 1000
     times = [datetime.fromisoformat(c["time"]) for c in candles]
@@ -138,8 +139,7 @@ def test_provider_failures_are_disconnected_without_candles(provider):
 
 
 def test_request_validation(fixture_client):
-    assert get(fixture_client, "M1").status_code == 422
-    assert get(fixture_client, "W1").status_code == 422
+    assert get(fixture_client, "MN1").status_code == 422  # valid enum, not a chart timeframe
     assert get(fixture_client, "X9").status_code == 422
     assert get(fixture_client, "M5", limit=0).status_code == 422
     assert get(fixture_client, "M5", limit=1001).status_code == 422

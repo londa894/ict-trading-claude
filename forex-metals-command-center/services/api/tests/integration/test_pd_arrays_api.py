@@ -52,7 +52,7 @@ def test_pd_arrays_endpoint_consistent_with_chart(fixture_client, tf):
         c["time"]
         for c in fixture_client.get("/api/v1/candles/XAUUSD", params={"timeframe": tf}).json()["candles"]
     }
-    assert body["timeframe"] == tf and body["strategyVersion"] == "0.19.0-phase19"
+    assert body["timeframe"] == tf and body["strategyVersion"] == "0.20.0-phase20"
     assert body["eligibleForDecision"] is False and "DATA_SYNTHETIC" in body["ineligibility"]
     assert body["zones"] and body["displacements"]
     zone_ids = {z["id"] for z in body["zones"]}
@@ -83,7 +83,7 @@ def test_invalid_data_has_no_pd_analysis():
 
 
 def test_pd_request_validation(fixture_client):
-    assert fixture_client.get("/api/v1/pd-arrays/XAUUSD", params={"timeframe": "W1"}).status_code == 422
+    assert fixture_client.get("/api/v1/pd-arrays/XAUUSD", params={"timeframe": "MN1"}).status_code == 422
     assert fixture_client.get("/api/v1/pd-arrays/BTCUSD").status_code == 404
 
 

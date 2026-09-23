@@ -15,6 +15,7 @@ from app.domain.enums import (
     ExpansionState,
     JudasStatus,
     KillZone,
+    LiquiditySide,
     MarketStatus,
     SessionInstanceState,
     SessionName,
@@ -217,6 +218,23 @@ class JudasSwing(ApiModel):
     detail: str
 
 
+class SessionSweepConfluence(ApiModel):
+    """Elevated-confidence multi-session sweep (spec section 5).
+
+    London failed to take out Asia's level, then a single New York candle swept BOTH Asia's and
+    London's level in one move. Read-only session context (a stronger raid signal); never a trade."""
+
+    id: str
+    trading_day: date
+    session: SessionName  # the NY session whose candle produced the confluence sweep
+    side: LiquiditySide  # SSL = both session lows swept, BSL = both session highs swept
+    asia_level: float
+    london_level: float
+    sweep_time: datetime
+    sweep_extreme: float
+    detail: str
+
+
 class SessionAnalysis(ApiModel):
     symbol: str
     source_timeframe: Timeframe
@@ -233,6 +251,7 @@ class SessionAnalysis(ApiModel):
     previous_session: PreviousSession | None
     adr: AdrState | None
     judas: list[JudasSwing]
+    sweep_confluence: list[SessionSweepConfluence]
     provider_error: str | None
     strategy_version: str
     generated_at: datetime

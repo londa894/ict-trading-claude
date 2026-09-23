@@ -7,7 +7,11 @@ Conventions (deterministic, vendor-independent):
   trading day D runs from (D-1) 17:00 to D 17:00 New York; H4 buckets start at 17, 21, 01, 05, 09, 13.
   US DST changes happen at 02:00 on Sundays while FX/metals are closed, so every bucket that can
   contain bars is exactly 4h / 24h long. That is asserted, not assumed.
-- W1/MN1: not supported by the candle engine yet.
+- W1: anchored to the Sunday 17:00 New York session open (the weekly open ICT watches). A trading
+  week runs Sunday 17:00 -> Friday 17:00 New York. A DST change falls on the terminal Sunday while the
+  market is closed, so a week bucket's UTC length can be 7 days +/- 1h; weekly buckets are therefore
+  built from D1 (see aggregate_weekly), never sized by a fixed duration.
+- MN1: not supported by the candle engine yet.
 """
 
 from __future__ import annotations
@@ -41,12 +45,26 @@ def trading_day_start(instant: datetime) -> datetime:
     return datetime.combine(roll_date, TRADING_DAY_ROLL, tzinfo=NEW_YORK).astimezone(UTC)
 
 
+def trading_week_start(instant: datetime) -> datetime:
+    """UTC start (Sunday 17:00 New York) of the trading week containing `instant`.
+
+    The weekly open is the Sunday session open; the week's constituent trading days start on Sun,
+    Mon, Tue, Wed and Thu at 17:00 New York."""
+    day_local = trading_day_start(instant).astimezone(NEW_YORK)
+    # weekday(): Mon=0 .. Sun=6. Trading-day starts only ever land on Sun-Thu, so this walks back to Sun.
+    days_since_sunday = (day_local.weekday() - 6) % 7
+    week_date = day_local.date() - timedelta(days=days_since_sunday)
+    return datetime.combine(week_date, TRADING_DAY_ROLL, tzinfo=NEW_YORK).astimezone(UTC)
+
+
 def bucket_start(instant: datetime, timeframe: Timeframe) -> datetime:
     _require_supported(timeframe)
     instant = require_utc(instant, "instant")
     if timeframe.is_fixed_intraday:
         elapsed = instant - _EPOCH
         return _EPOCH + (elapsed // timeframe.duration) * timeframe.duration
+    if timeframe.is_trading_week_anchored:
+        return trading_week_start(instant)
     day_start = trading_day_start(instant)
     if timeframe is Timeframe.D1:
         return day_start

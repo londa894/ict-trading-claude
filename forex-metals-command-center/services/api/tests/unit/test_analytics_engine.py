@@ -71,7 +71,7 @@ def sample(
         entry_price=2380.0,
         mfe_price=mfe_price,
         synthetic=False,
-        strategy_version="0.19.0-phase19",
+        strategy_version="0.20.0-phase20",
     )
 
 

@@ -247,6 +247,12 @@
     "LOW",
     "UNCLEAR"
   ],
+  "LiquidityEligibility": [
+    "EXTERNAL_TREND_ALIGNED",
+    "INTERNAL_ONLY",
+    "UNRESTRICTED",
+    "REVERSAL_EXEMPT"
+  ],
   "DisplacementGrade": [
     "WEAK",
     "MODERATE",
@@ -255,7 +261,9 @@
   ],
   "PdArrayType": [
     "FVG",
-    "IFVG"
+    "IFVG",
+    "IMR",
+    "REVERSAL_FVG"
   ],
   "PdArrayState": [
     "FRESH",
@@ -279,7 +287,9 @@
     "INVALIDATED",
     "IFVG_POTENTIAL",
     "IFVG_CONFIRMED",
-    "IFVG_FAILED"
+    "IFVG_FAILED",
+    "IMR_CREATED",
+    "REVERSAL_FVG_CREATED"
   ],
   "NoWickClassification": [
     "TRUE_BULLISH_MARUBOZU",
@@ -300,6 +310,10 @@
     "MEANINGFUL",
     "STRONG",
     "EXCEPTIONAL"
+  ],
+  "NoWickVariant": [
+    "LATE_CANDLE_FADE",
+    "EARLY_CANDLE_CONTINUATION"
   ],
   "NoWickZoneState": [
     "FRESH",
@@ -383,6 +397,10 @@
     "SETUP_FORMING",
     "LIQUIDITY_EVENT",
     "WAITING_FOR_MSS",
+    "REBALANCE_WATCH",
+    "REBALANCE_TOUCH",
+    "REACTION",
+    "CONFIRMATION",
     "SETUP_ARMED",
     "WAITING_FOR_RETRACEMENT",
     "ENTRY_ZONE_APPROACHING",
@@ -398,7 +416,17 @@
     "CLOSED"
   ],
   "SetupType": [
-    "LIQUIDITY_SWEEP_MSS"
+    "LIQUIDITY_SWEEP_MSS",
+    "REVERSAL_NO_WICK_IFVG"
+  ],
+  "ReversalOriginKind": [
+    "NO_WICK",
+    "IMR"
+  ],
+  "ReversalConfirmation": [
+    "IFVG_FLIP",
+    "NEW_FVG",
+    "IMR"
   ],
   "SetupStep": [
     "HTF_BIAS",

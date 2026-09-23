@@ -42,7 +42,7 @@ function run(over: Partial<BacktestRun> = {}): BacktestRun {
       variants: [variant()], data: { provider: "stub-real", isSynthetic: true, executionBars: 96, stepBars: 32, firstBar: T, lastBar: T },
       disclosures: ["Risk locks, the news gate and verdict authority are NOT applied.", "Past simulated results are not a forecast."], configHash: "a".repeat(64), completedAt: T,
     },
-    createdAt: T, startedAt: T, finishedAt: T, integrity: "VERIFIED", authority: "RESEARCH_ONLY", strategyVersion: "0.19.0-phase19", ...over,
+    createdAt: T, startedAt: T, finishedAt: T, integrity: "VERIFIED", authority: "RESEARCH_ONLY", strategyVersion: "0.20.0-phase20", ...over,
   };
 }
 

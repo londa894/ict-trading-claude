@@ -908,3 +908,285 @@ Approved and completed — see Phases 1–2 above.
 - NOTE: ifvg acceptanceCloses/acceptanceExtensionAtr/displacementMinGrade config is now unused (dead) — to
   be removed with the deferred strategyVersion bump. A full continuation before/after backtest is available
   on request (the mechanic change is intended per spec).
+
+### Phase A — Step 3: REVERSAL_FVG sub-state (spec section 3) — DONE
+- New `PdArrayType.REVERSAL_FVG` + `PdArrayEventType.REVERSAL_FVG_CREATED`. Chain: FVG → close-through spawns a
+  POTENTIAL IFVG → failed retest CONFIRMED_IFVG (Step 2) → a **2nd disrespect** (confirmed IFVG closed back
+  through its far edge) spawns a REVERSAL_FVG in the ORIGINAL bias direction, as a child of the IFVG. Spawned
+  in `fvg.py::_mitigate`; then tracked with the normal FVG mitigation lifecycle (T/P/H/F/I), no further spawn.
+- Eligibility helper `reversal_fvg_eligible(zones)`: a REVERSAL_FVG is only usable as a confirmation source
+  when no other inefficiency (FVG/IFVG/IMR) is still active — `_BLOCKING_INEFFICIENCIES` guard.
+- Contract sync: `packages/strategy-spec/enums.json` PdArrayType + PdArrayEventType extended to match Python
+  (IMR/REVERSAL_FVG, IMR_CREATED/REVERSAL_FVG_CREATED) so `test_python_enums_match_strategy_spec_exactly` passes.
+- Tests: `test_imr_engine.py` REVERSAL_FVG chain + ineligibility cases; `test_pd_arrays_engine` confirmed-IFVG
+  now asserts exactly one BULLISH REVERSAL_FVG child; `test_pd_arrays_properties` grammar map extended
+  (REVFVG `^RT?P?H?F?I?$`, IMR `^M$`) + REVERSAL_FVG_CREATED known-at exemption. Full unit suite: **819 passed,
+  4 failed** — the 4 are pre-existing config-default drift (chase-guard/confirm-first flags on, Asia ACCEPTABLE,
+  min_target_atr 1.0) owed to the deferred strategyVersion bump, unrelated to this step.
+- Live: `/pd-arrays/XAUUSD` returns 29 REVERSAL_FVG + 5 IMR zones alongside 55 FVG / 47 IFVG; REVERSAL_FVG_CREATED
+  and IMR_CREATED events firing. Continuation model unaffected (still reads FVG/IFVG only).
+
+### Phase A — Step 4: W1 aggregation + no-wick on M1/M30/W1 (spec: HTF no-wick coverage) — DONE
+- `CHART_TIMEFRAMES` now includes M1, M30 (native TradeLocker resolutions) and W1 (derived). `Timeframe`
+  gains `is_trading_week_anchored`; `is_engine_supported` now spans intraday + H4/D1 + W1 (only MN1 remains
+  unsupported).
+- **W1 anchoring**: the weekly candle opens at the Sunday 17:00 New York session open and runs to Friday
+  17:00 (the ICT weekly open), DST-aware — `trading_week_start` in `timeframes/core.py`. A week that spans a
+  DST change is 7d +/- 1h in UTC, so weekly candles are built from D1 by a dedicated `aggregate_weekly()`
+  (never sized by a fixed duration); the generic intraday `aggregate()` still refuses W1 as a target. The
+  `Candle` close-time validator now allows W1 (and MN1) their calendar-variable length.
+- **Derivation & cost**: W1 = H1 -> D1 -> W1. A weekly window costs ~168 H1 bars/week, and TradeLocker caps a
+  single history request (~11.6k H1), so `load_series` clamps W1 to `_MAX_W1_LIMIT = 64` weeks (~10.9k H1),
+  which yields >50 closed weekly candles — enough to clear the structure `minCandles=50` gate. The no-wick
+  HTF context requests W1 at that cap and M1/M30/M15 etc. at the default.
+- Spec/contract sync: `no_wick.json` htfTimeframes = [W1, D1, H4, H1, M30, M15, M1]; shared
+  `contract/api_fields.json` ChartTimeframes extended to match `CHART_TIMEFRAMES`.
+- Tests: new W1 bucket tests (Sunday-open anchoring across DST), `aggregate_weekly` happy/incomplete/forming/
+  DST-week/non-D1-reject, Candle variable-week validation, quality test repurposed (W1 supported + alignment
+  enforced), api-field-contract updated. Full unit suite: **830 passed, 4 failed** (same pre-existing
+  config-default drift as Step 3; nothing new).
+- Live: `/no-wick/XAUUSD/htf` returns all 7 timeframes eligible with meaningful no-wick events —
+  W1 NEAR_BEARISH_MARUBOZU (4), D1/H4/H1/M30/M15/M1 all firing; authority CONTEXT_ONLY (never authorizes).
+  `/candles/XAUUSD?timeframe=W1` serves clean weekly candles.
+
+### Phase A — Step 5: forming-candle exposure (LATE_CANDLE_FADE groundwork) — DONE
+- New `FormingCandle` model + `build_forming_candle(timeframe, candles, now)` in `no_wick/features.py`:
+  describes the live, not-yet-closed bar (last candle when `is_closed=False`) — running OHLC, body/wick
+  geometry (same ratio conventions as CandleFeatures), `direction`, and `maturity_pct` (0..100 wall-clock
+  elapsed through the bucket, clamped). Returns None when the last bar is already closed or the series is empty.
+- `NoWickAnalysis` gains a `forming: FormingCandle | None` field; `run_pipeline` computes it from the raw
+  series and attaches it. **Closed-bar discipline preserved** — `forming` is descriptive only, never consumed
+  by any engine, event, or verdict (analysis still runs strictly on `closed`). `/no-wick/{symbol}/htf` now
+  carries a `forming` block per timeframe.
+- Groundwork for the reversal spec's section 1 (LATE_CANDLE_FADE = mature bar, strong body, small leading
+  wick; EARLY_CANDLE_CONTINUATION = early bar, directional body). The fade/continuation logic itself is Phase C.
+- Tests: `test_no_wick_engine.py` — geometry+maturity, None when closed/empty, flat-bar null ratios/direction,
+  overdue-clock maturity clamp. Full unit suite: **834 passed, 4 failed** (same pre-existing config drift).
+- Live: htf `forming` populated for all 7 timeframes with sensible maturities (e.g. D1 98.6% near its close,
+  H1 an 82%-body bearish bar closing near its low — the LATE_CANDLE_FADE shape); authority CONTEXT_ONLY.
+- Phase A complete. Next: Phase B — liquidity trend-aligned targeting (spec section 5).
+
+### Phase A — post-completion audit / cross-package sync — DONE
+A "did we miss anything" sweep found the frontend/shared-types mirrors were not updated alongside the
+Python changes in Steps 3-5. Fixed and re-verified:
+- `packages/shared-types/src/index.ts`: `PD_ARRAY_TYPES` (+IMR, +REVERSAL_FVG), `PD_ARRAY_EVENT_TYPES`
+  (+IMR_CREATED, +REVERSAL_FVG_CREATED), `CHART_TIMEFRAMES` (+M1, M30, W1), new `FormingCandle` interface,
+  `NoWickAnalysis.forming`. Without this the TS `contract.test.ts` (enum parity vs enums.json) and
+  `fields.test.ts` (ChartTimeframes vs api_fields.json) were broken.
+- `packages/shared-types/contract/api_fields.json`: added `FormingCandle` + `NoWickAnalysis.forming` so the
+  shared contract documents what the API actually emits.
+- Frontend `apps/web`: noWick test fixture `forming: null`; ChartPanel timeframe-toolbar test now expects the
+  8-button set; added a W1 chart derivation note. `quality.py` stale "W1 unsupported" comment corrected.
+- Verified green: Python 834 passed / 4 deferred; shared-types 253 passed + tsc clean; web 420 passed + tsc
+  clean. Live: single `/no-wick/XAUUSD?timeframe=W1` now returns 52 candles, eligible, forming populated
+  (the load_series W1 clamp fixed the previous 300-limit failure).
+
+## Playbook Revamp — Phase B (liquidity trend-aligned targeting, spec section 5)
+
+### Phase B1 — trend-aligned DOL eligibility + REVERSAL_EXEMPT — DONE
+First phase that changes the LIVE continuation model (DOL selection feeds the WAIT-class DOL_UNCLEAR blocker).
+- New enum `LiquidityEligibility` = EXTERNAL_TREND_ALIGNED | INTERNAL_ONLY | UNRESTRICTED | REVERSAL_EXEMPT;
+  `DolSelection.eligibility` exposes which regime produced the selection.
+- `select_dol(pools, atr, cfg, trend, *, reversal_exempt=False)` now filters counter-trend EXTERNAL pools:
+  bullish structure draws to external highs (+ internal pullback liquidity), bearish to external lows,
+  trend NONE = UNRESTRICTED. Internal pools are always eligible. A reversal setup passes
+  `reversal_exempt=True` to bypass the filter and target the opposite draw (plumbed for Phase D; not yet
+  called in the live path). Confidence/DOL_UNCLEAR margin is now computed over the eligible set, so a clear
+  trend no longer produces spurious two-sided DOL_UNCLEAR against the trend.
+- Reversibility: `liquidity.json dol.trendAlignedTargeting` (default true) — engine passes trend=NONE when
+  off, restoring legacy behavior for an A/B backtest.
+- Contract sync (per ict-contract-sync): enums.json + Python CONTRACT_ENUMS + TS LIQUIDITY_ELIGIBILITIES /
+  LIQUIDITY_CONTRACT_ENUMS + api_fields.json DolSelection + TS DolSelection interface + both TS test lists +
+  web liquidity fixture.
+- Tests: select_dol eligibility cases (no-trend unrestricted, bullish excludes external lows, bearish mirror,
+  internal-only, reversal-exempt bypass, DOL_UNCLEAR relaxed against trend, flag default). Python 841 passed /
+  4 deferred; shared-types 254 + tsc; web tsc clean.
+- Live: `/liquidity/XAUUSD` DOL = EXTERNAL_TREND_ALIGNED, primary PDL (SSL) — XAUUSD bearish, external lows
+  are the eligible draw. No downstream verdict/setup test regressions.
+- NOTE: a before/after continuation backtest (flag on vs off) is available on request to quantify the
+  DOL_UNCLEAR gating delta.
+### Phase B2 — significant-liquidity tiering — DONE
+- `significance_rank(pool_type)` in liquidity scoring: week (PWH/PWL) > day (PDH/PDL) > session (Asia/London/
+  NY highs-lows) > everything else. Used as a deterministic tiebreak in `select_dol` after magnet score and
+  before proximity, so among equally-scored eligible pools the higher timeframe wins. Reusable by the §6
+  setup layer for scoring session/day/week-aligned "silver bullet" macro windows.
+- Tests: tie-break picks the weekly high over a session high. Live continuation model still selects sensibly.
+
+### Phase B3 — multi-session sweep confluence — DONE
+- New `SessionSweepConfluence` model + `sessions/sweep_confluence.py`: when London fails to take out Asia's
+  extreme (its low stays above Asia's low / high below Asia's high) and a single New York candle then sweeps
+  BOTH levels in one move (its range spans from at/above the nearer London level through the farther Asia
+  level), it is flagged as an elevated-confidence sweep. Deduped to the first NY session per (day, side).
+  Read-only session context (SSL/BSL side); never a trade. Attached to `SessionAnalysis.sweepConfluence`.
+- Contract sync (per ict-contract-sync): api_fields.json SessionSweepConfluence + SessionAnalysis.sweepConfluence;
+  TS SessionSweepConfluence interface + SessionAnalysis field + fields.test list/import; web sessions fixture.
+- Tests: SSL both-lows sweep, BSL mirror, no-fire when London already took Asia's level, no-fire when NY does
+  not reach both in one candle, dedupe to first NY session. Python 847 passed / 4 deferred; shared-types 255 +
+  tsc; web tsc clean + sessions 24 passed.
+- Live: `/sessions/XAUUSD` returns 2 confluences (2026-09-11 NY_AM SSL; 2026-09-16 NY_AM BSL) with coherent
+  levels; the NY_PM duplicate correctly deduped.
+
+**Phase B (spec section 5) complete.**
+
+## Playbook Revamp — Phase C (no-wick rewrite, spec section 1)
+
+### Phase C — LATE_CANDLE_FADE + EARLY_CANDLE_CONTINUATION variants — DONE
+Scope note: section 1 mixes the no-wick *signal variants* (the detection/context layer) with a *mechanical
+entry model* (steps 1-6: rebalance -> LTF sweep -> IFVG -> MSS, daily-range target, breakeven, unfilled-
+no-wick gating). Phase C builds the variants layer; the entry model is setup/entry machinery deferred to
+Phase D (the REVERSAL_NO_WICK_IFVG setup), where that stack is built.
+- New enum `NoWickVariant` = LATE_CANDLE_FADE | EARLY_CANDLE_CONTINUATION, computed on the live (forming)
+  candle from Step 5:
+  - LATE_CANDLE_FADE: maturity >= 75%, directional body, still no wick on one side -> fade TOWARD the
+    missing wick (no lower wick -> BEARISH, no upper wick -> BULLISH; a late marubozu fades against the body).
+  - EARLY_CANDLE_CONTINUATION: maturity <= 25%, directional body with the trailing (origin-side) wick
+    already formed -> the early pullback is continuation, not invalidation; signal = body direction.
+- `FormingCandle` gains `variant`, `signalDirection`, `originWeight` (origin-timeframe directional-quality
+  weight D1/W1=1.0 > H4=0.7 > H1=0.5 > M30=0.3 > M15/M5/M1; a multiplier, never a probability). Config in
+  `no_wick.json variants`.
+- Confluence only: the forming candle/variant is context, authority stays CONTEXT_ONLY, never authorizes a
+  side. No fixed win-rate numbers encoded.
+- Contract sync (per ict-contract-sync): enums.json + Python CONTRACT_ENUMS + TS NO_WICK_VARIANTS /
+  NO_WICK_CONTRACT_ENUMS + api_fields.json FormingCandle + TS FormingCandle interface + fields.test list.
+- Tests: late-fade both directions, late marubozu, early continuation, no-variant mid-life, origin weights;
+  existing forming tests updated for the new cfg arg. Python 852 passed / 4 deferred; shared-types 256 + tsc;
+  web tsc clean.
+- Live: W1 forming carries variant/signalDirection/originWeight (weight 1.0); intraday timeframes show
+  forming=None during the current DAILY_BREAK (last bars closed) — correct market-state behavior.
+
+## Playbook Revamp — Phase D (REVERSAL_NO_WICK_IFVG setup, spec section 6)
+
+Large build — a new counter-bias state machine that runs alongside the continuation model. Built in
+verified sub-steps. Direction = the origin no-wick/IMR candle's body direction (the counter-bias push whose
+continuation the setup trades after a rebalance).
+
+### Phase D1 — enum foundation + engine skeleton (discovery -> rebalance -> reaction) — DONE
+- Enums: `SetupType += REVERSAL_NO_WICK_IFVG`; `SetupState +=` REBALANCE_WATCH, REBALANCE_TOUCH, REACTION,
+  CONFIRMATION (shared enum so the verdict/UI read reversal setups generically); new `ReversalOriginKind`
+  (NO_WICK/IMR) and `ReversalConfirmation` (IFVG_FLIP/NEW_FVG/IMR, forward-declared for D2).
+- New `app/services/reversal/` module: `models.py` (ReversalConfig, OriginZone, ReversalSetup, ReversalEvent)
+  + `engine.py` `analyze_reversals(origins, candles, bias, displacements, cfg)`. Candle-sequential, no
+  lookahead. State flow: DISCOVERED -> REBALANCE_WATCH -> REBALANCE_TOUCH (edge touch sufficient) -> REACTION
+  (rejection wick on the zone side that closes back out, OR an opposite-direction displacement close);
+  terminals INVALIDATED (close beyond the origin far edge) / EXPIRED (no rebalance / no reaction in window).
+- **Bias gate** (`bias_gate_allows`): a counter-bias reversal is allowed only when the origin is on D1 (a
+  daily imbalance outranks the bias) OR the HTF bias is non-directional (RANGING/TRANSITIONING/MIXED/UNCLEAR);
+  a directional bias blocks an H4/H1 origin. Config `reversal.json`.
+- Tests: `test_reversal_engine.py` — bearish discover/rebalance/react, bullish mirror, reaction-via-
+  displacement, invalidation, expiry (no rebalance / no reaction), bias gate blocks H4/H1 in a trend and
+  allows D1. Python 860 passed / 4 deferred; shared-types 258 + tsc; web tsc clean. Enums synced all 4 layers.
+- Not yet wired to any endpoint/verdict (D4).
+
+### Phase D2 — confirmation stack -> ARMED — DONE
+- After REACTION, within `confirmation.flipWindowBars`, any ONE of these arms the setup (spec section 6):
+  IFVG_FLIP (a CONFIRMED_IFVG in the reversal direction that overlaps the origin body), NEW_FVG (a fresh FVG
+  left by the reversal displacement leg, reversal direction), or IMR (a fresh IMR, reversal direction). All
+  firing confirmations are logged (`confirmations` + `confirming_zone_ids`) for D3 entry selection and
+  scoring/journaling. State path REACTION -> CONFIRMATION -> SETUP_ARMED; protective_level = origin far edge.
+  EXPIRED if none within the flip window. `analyze_reversals` now takes `pd_zones` / `pd_events`.
+- Tests: armed-by-NEW_FVG / IMR / IFVG_FLIP, IFVG-not-at-origin rejected, wrong-direction FVG rejected,
+  expiry without confirmation (14 reversal tests total). Python 866 passed / 4 deferred.
+### Phase D3 — entry plan + target + ATR-scaled stop — DONE
+- Built at ARM (never an authorization — the verdict path still gates it). Added to `ReversalSetup`:
+  `entry_price`, `entry_zone_id`, `stop_price`, `target_price`/`target_pool_id`/`target_label`, `rr`.
+- Entry: limit at the confirming structure's midpoint — the most-recent, then tightest, confirming zone
+  (`_entry_zone`); IMR uses the same zone level as its structural level.
+- Stop: `origin.far_edge +/- stopBufferAtr x ATR` (ATR-scaled, per direction; `atr` passed into the engine).
+- Target: nearest opposite-side draw beyond entry (`_nearest_target`) — SSL for a bearish reversal, BSL for a
+  bullish one — REVERSAL_EXEMPT (no trend filter), ties broken by significant-liquidity tier (Phase B2's
+  `significance_rank`). `rr` = reward/risk. `analyze_reversals` now takes `liquidity_pools` + `atr`.
+- Tests: plan (entry/stop/target/rr) at ARM, entry picks the tightest confirming structure, target
+  nearest-with-tier-tiebreak, no-target when no opposite-side pool (18 reversal tests total). Python 870
+  passed / 4 deferred; reversal module lint-clean.
+### Phase D4 (go-live, behind an A/B flag) — IN PROGRESS
+A/B master switch `reversal.json enabled: false` (default OFF) -> `ReversalConfig.enabled`; the reversal
+setup must never reach the live verdict until this is flipped on.
+
+- **D4a — ARMED -> ENTRY_ZONE -> BLOCKED + chase guard — DONE.** After ARM, price must retest the entry zone
+  (`entry.windowBars`) -> ENTRY_ZONE_TOUCHED -> BLOCKED (plan ready, pending risk/news gates). Chase guard:
+  if the target is reached before entry -> ENTRY_MISSED (terminal). EXPIRED if the entry zone is not retested
+  in the window. Tests: blocked-on-retest, chase-guard entry-missed, entry-window expiry.
+- **D4b — real HTF origin sourcing — DONE.** `reversal/origins.py build_origins(no_wick_zones, imr_zones,
+  cfg)`: active no-wick + IMR zones on D1/H4/H1 -> OriginZone (reversal direction = origin body direction;
+  body = candle body; far edge = origin-side extreme). Weighted D1 > H4 > H1. Tests: no-wick + IMR geometry
+  (both directions), inactive/non-origin-TF exclusion, weight ranking. 25 reversal tests total; Python 877
+  passed / 4 deferred; reversal module lint-clean. No new enums/contract surface.
+- **D4c — ReversalService + read-only endpoint — DONE.** `reversal/service.py` runs per-TF pipelines on
+  D1/H4/H1 for origins + HTF bias (`classify_htf_bias`), plus the decision-TF (M15) pd zones/events,
+  liquidity pools, displacements and ATR, then `analyze_reversals`. Returns `ReversalAnalysis` (bias, enabled
+  flag, origin_count, current = furthest-advanced non-terminal setup, setups, events). Wired into AppState +
+  `GET /api/v1/reversal/{symbol}`. Contract synced all 4 layers: OriginZone / ReversalEvent / ReversalSetup /
+  ReversalAnalysis in api_fields.json + TS interfaces + fields.test. Live: 11 origins, 2 setups at BLOCKED
+  with coherent plans (IMR H1 rr 5.56; H4 rr 0.6), `enabled=false`.
+- **D4d — verdict wiring behind the A/B flag — DONE.** `MarketStateService._apply_reversal` contributes a
+  counter-bias LONG/SHORT using the existing decision fields (`setup_type=REVERSAL_NO_WICK_IFVG`, entry/stop/
+  tp1/rr). Hard-gated + short-circuited: it returns immediately (no expensive analysis) unless the flag is on
+  AND `verdict_authority()=="FULL"` AND the decision is not already directional (continuation wins — the
+  conflict rule) AND no blockers remain. With `enabled=false` + FAIL_SAFE_ONLY authority it is a guaranteed
+  no-op; live market-state verdict unchanged. Full suite 877 passed / 4 deferred (market_state/gate tests all
+  green); reversal code lint-clean (2 pre-existing continuation-path E501s left as-is).
+- **Phase D complete** (engine D1-D3, go-live D4a-d, all behind `reversal.json enabled:false`). To activate:
+  set `enabled: true` AND raise `verdict_authority` to FULL. Recommended: A/B backtest first.
+- D5 (optional next): reversal scoring block + Asia/Wed-Thu-Fri soft boost + journaling; then the deferred
+  strategyVersion bump.
+
+### Phase D — A/B backtest of the reversal (go/no-go before enabling) — IN PROGRESS
+Gate to enable live: **expectancy > 0.2R AND profit factor >= 1.5** on a meaningful multi-year sample.
+Runs against the cleaned research dataset (DATA_ROOT/cleaned/XAUUSD, hive parquet by year, 2004-2026),
+NOT the TradeLocker live feed (whose historical M15 fails the validation gate — the original blocker).
+
+- **Harness** (`%TEMP%/claude/rev_backtest.py`, `cache_provider.py`): reuses the app's no-lookahead
+  `run_variant` (same code path as the live backtest) with a reversal `analyze(t)` adapter that maps
+  `ReversalService.analyze(now=t)` setups (entry/stop/target/armed_at) into the plan shims run_variant
+  expects. Paper engine fills/exits on M5; one position at a time; net R after costs.
+- **Performance fixes** (per-step analyze was 1.1s/call -> 8h/yr, infeasible):
+  1. `CachingHistoryProvider` — preloads the parquet window once into memory and serves byte-identical
+     `get_historical_bars` slices (bisect on open_time); `health_check` computed once. 1126->609 ms/call.
+  2. Bucket-memoized pipeline — each timeframe's pipeline is cached by `bucket_start(now, tf)`; within a
+     forming bucket the *closed*-candle set (all the reversal engine reads) is invariant, so the cache is
+     EXACT, not approximate. Verified: memoized vs non-memoized 2-week run produce identical funnel + trades
+     (discovered=11, confirmed=7, fills=2, closed=2, same R). 609->~138 ms/step (D1 origin 320ms recomputed
+     once/day instead of every M15 step, etc.).
+- **Loader cap bug found + worked around:** `BacktestService._load` walks back in <=200 chunks of 1000 =
+  a hard **200,000-bar cap**; 3yr of M5 (~212k) was silently truncated, leaving the early window with no
+  execution bars (positions stuck pending, blocking everything). Harness uses `load_full` (uncapped, served
+  from the in-memory cache) — verified step + exec both span the full 1095 days.
+- **RESULT (3-year run 2022-09-01 -> 2025-09-01, 2.83h wall, n=199 closed):**
+  - discovered=760, plans_confirmed=414, fills=199, closed=199, skipped_overlap=62, open_at_end=0.
+  - **winrate 56.3%, expectancy 0.039R, median 0.245R, PF 1.09, totalR +7.77.**
+  - Yearly avgR: 2022(Sep-Dec) -0.067 (n=25), 2023 +0.062 (n=53), 2024 +0.060 (n=66), 2025(Jan-Aug) +0.040
+    (n=55). Positive but marginal every full year; 2022 negative.
+- **VERDICT: FAILS the go-live gate** (needs expectancy >0.2R AND PF >=1.5; got 0.039R / PF 1.09). The raw
+  setup is only faintly profitable — high win rate but winners barely exceed losers (mean << median => a few
+  large losers). **Reversal stays `enabled:false`; do NOT flip on.** Note: research run applies NO risk/news/
+  session/verdict-authority gates (run_variant is unfiltered) — those only remove trades, they don't lift
+  per-trade edge unless correlated with quality.
+- **Diagnostic (2024, n=66, trades dumped to `%TEMP%/claude/rev_trades_2024.json`):** sharp DIRECTION split
+  — BULLISH n=33 win 76% avgR +0.482 PF 2.97 (clears the gate); BEARISH n=33 win 42% avgR -0.362 PF 0.38
+  (drags it to breakeven). By session London/NY_AM positive, ASIA worst (-0.24, n=8); the user's Asia x
+  Wed/Thu/Fri window was negative (n=6) — this counter-bias reversal does NOT ride the Asia continuation edge.
+  CAVEAT: 2024 was a strong gold uptrend, so long-only success is likely trend contamination (trend-following
+  in disguise), not a robust reversal edge.
+- **DECISION 2026-09-23 — SHELVED.** User elected to shelve rather than spend more backtest time chasing the
+  directional split. The reversal stays fully built and flag-gated OFF (`reversal.json enabled:false` +
+  verdict_authority not FULL => guaranteed no-op). No contract/enum changes. D5 (scoring/journaling) is moot
+  unless revived. To revisit: test the BULLISH-only edge in a non-uptrend regime (2022) before trusting it.
+
+### strategyVersion bump + test cleanup + M1 fix — DONE 2026-09-23
+A full-suite audit found the prior "877 passed / 4 deferred" was inaccurate: 12 Python tests were failing
+(none a production bug). All resolved; the suite is now fully green (Python 1244, TS shared-types 262,
+apps/web tsc clean + 420).
+- **Version bump:** `strategy_version.json` -> `0.20.0-phase20`, phase 20, "Playbook Revamp" (enabledEngines
+  unchanged; reversal flag-gated OFF; verdictAuthority stays FAIL_SAFE_ONLY). Replaced the `0.19.0-phase19`
+  literal across 48 test files (Python + web fixtures); production reads the version from the JSON, so no app
+  code changed. `test_contracts` phase 19->20.
+- **Config-drift assertions (4)** updated to shipped values: chaseGuardAfterTouchOnly / confirmBeforeChaseGuard
+  True, minTargetAtr 1.0, Asia session quality ACCEPTABLE.
+- **Stale timeframe validation (5):** the *_request_validation tests now use MN1 (valid enum, not a chart TF)
+  instead of the now-supported M1/W1.
+- **Synthetic fixture:** added M30 to `SyntheticFixtureProvider.NATIVE_TIMEFRAMES` (derived from the M5 base);
+  M1 excluded from the every-chart-timeframe test (finer than the M5 base; M1 verified on real data).
+- **Alerts test:** repointed the monkeypatch from the removed `alerts.service.load_spec` to `verdict_authority`.
+- **M1 no-wick removed (user correction):** M1 was wrongly added to `no_wick.json` decisionContext.htfTimeframes
+  and originTimeframeWeights; both removed. M1 is for tighter ENTRIES only, never no-wick. M1 stays a servable
+  chart timeframe; it is in no decision path (reversal origins are D1/H4/H1). Folded into the same version bump.

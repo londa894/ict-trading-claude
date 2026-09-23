@@ -53,7 +53,7 @@ def fixture_client():
 
 def test_setups_endpoint_on_synthetic_data_is_blocked(fixture_client):
     body = fixture_client.get("/api/v1/setups/XAUUSD").json()
-    assert body["strategyVersion"] == "0.19.0-phase19" and body["timeframe"] == "M15"
+    assert body["strategyVersion"] == "0.20.0-phase20" and body["timeframe"] == "M15"
     assert body["eligibleForDecision"] is False and "DATA_SYNTHETIC" in body["ineligibility"]
     assert body["currentState"] == "BLOCKED"
     assert body["bias"]["timeframes"] == ["H4", "H1"]

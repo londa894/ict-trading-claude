@@ -29,7 +29,7 @@ function news(over: Partial<NewsAssessment> = {}): NewsAssessment {
     windowStart: "2024-04-18T14:50:00Z", windowEnd: "2024-04-18T15:20:00Z",
     events: [event(), event({ id: "US-PPI", name: "PPI m/m", scheduledTime: "2024-04-18T12:30:00Z", status: "COMPLETED", actual: "0.5%", surprise: 0.2, surprisePct: 66.67, minutesToEvent: -151 })],
     calendar: { provider: "file", source: "test", isSynthetic: false, available: true, fetchedAt: T, coverageStart: T, coverageEnd: T, reason: null },
-    blockers: ["NEWS_BLACKOUT"], warnings: [], strategyVersion: "0.19.0-phase19", generatedAt: T, ...over,
+    blockers: ["NEWS_BLACKOUT"], warnings: [], strategyVersion: "0.20.0-phase20", generatedAt: T, ...over,
   };
 }
 
@@ -106,7 +106,7 @@ const plan: EntryPlan = {
 const risk: RiskAssessment = {
   symbol: "XAUUSD", status: "NOT_CONFIGURED", profile: null, currency: null, profileError: null, limits: null, budget: null, locks: [],
   warnings: [], volatility: null, position: null, sizeStatus: null, blockers: ["RISK_PROFILE_MISSING"], news: "CLEAR", authority: "NOT_AUTHORIZED",
-  strategyVersion: "0.19.0-phase19", generatedAt: T,
+  strategyVersion: "0.20.0-phase20", generatedAt: T,
 };
 const clear = news({ state: "CLEAR", blockers: [], activeEvent: null, windowStart: null, windowEnd: null });
 
@@ -116,7 +116,7 @@ function evaluation(over: Partial<DecisionEvaluation> = {}): DecisionEvaluation 
     setupId: "s", setupType: "LIQUIDITY_SWEEP_MSS", setupState: "BLOCKED", score: 85, evaluatedMax: 95, grade: "A", confidence: "MODERATE",
     conflictScore: 0, dataQualityScore: 100, components: [], adjustments: [], hardBlockers: [], missingGates: [], warnings: [],
     evidenceFor: [], evidenceAgainst: [], devilsAdvocate: [], plan, risk, news: clear, macro: null, authority: "NOT_AUTHORIZED",
-    strategyVersion: "0.19.0-phase19", generatedAt: T, ...over,
+    strategyVersion: "0.20.0-phase20", generatedAt: T, ...over,
   };
 }
 

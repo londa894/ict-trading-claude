@@ -24,7 +24,7 @@ function state(over: Partial<ReplayState> = {}): ReplayState {
       eligibleForDecision: false, ineligibility: ["DATA_SYNTHETIC"], setupState: null, currentSetup: null, newYorkTime: "11:00",
       activeSessions: ["NEW_YORK"], timeQuality: "PRIME", authority: "EDUCATION_ONLY",
     },
-    guidance: null, quiz: null, lastResult: null, history: [], score: null, masked: false, authority: "EDUCATION_ONLY", strategyVersion: "0.19.0-phase19",
+    guidance: null, quiz: null, lastResult: null, history: [], score: null, masked: false, authority: "EDUCATION_ONLY", strategyVersion: "0.20.0-phase20",
     ...over,
   };
 }

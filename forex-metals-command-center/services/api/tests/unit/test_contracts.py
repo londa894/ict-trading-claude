@@ -13,8 +13,8 @@ def test_python_enums_match_strategy_spec_exactly():
 
 def test_strategy_version_is_fail_safe():
     sv = load_spec("strategy_version")
-    assert strategy_version() == "0.19.0-phase19"
-    assert sv["phase"] == 19
+    assert strategy_version() == "0.20.0-phase20"
+    assert sv["phase"] == 20
     assert sv["verdictAuthority"] == "FAIL_SAFE_ONLY"
 
 

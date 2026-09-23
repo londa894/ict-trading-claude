@@ -68,6 +68,7 @@ from app.services.replay.models import (
     StepRequest,
 )
 from app.services.replay.service import ReplayNotFoundError, ReplayRequestError
+from app.services.reversal.models import ReversalAnalysis
 from app.services.risk.models import RiskAssessment, RiskCalculationRequest
 from app.services.scanner.models import MarketRow, ScanResponse
 from app.services.scanner.service import markets as market_rows
@@ -263,6 +264,15 @@ async def no_wick_htf(symbol: Symbol, state: State) -> dict[str, object]:
     """No-wick context across the tracked timeframes (D1/H4/H1/M15). Read-only; never a trade authorization."""
     try:
         return await state.no_wick.htf_context(symbol)
+    except UnknownSymbolError as exc:
+        raise HTTPException(status_code=404, detail="unknown symbol") from exc
+
+
+@router.get("/api/v1/reversal/{symbol}", response_model=ReversalAnalysis, tags=["reversal"])
+async def reversal(symbol: Symbol, state: State) -> ReversalAnalysis:
+    """REVERSAL_NO_WICK_IFVG setups (counter-bias). Read-only; the `enabled` flag gates the live verdict."""
+    try:
+        return await state.reversal.analyze(symbol)
     except UnknownSymbolError as exc:
         raise HTTPException(status_code=404, detail="unknown symbol") from exc
 

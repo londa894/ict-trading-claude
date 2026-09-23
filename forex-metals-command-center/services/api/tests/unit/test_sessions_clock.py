@@ -68,7 +68,7 @@ def test_london_time_reflects_the_dst_gap_weeks():
         (utc(2024, 1, 9, 14, 0), [SessionName.NY_AM], [KillZone.NY_AM_KZ], Q.IDEAL),  # 09:00
         (utc(2024, 1, 9, 15, 30), [SessionName.NY_AM, SessionName.LONDON_CLOSE], [], Q.ACCEPTABLE),  # 10:30
         (utc(2024, 1, 9, 19, 0), [SessionName.NY_PM], [KillZone.NY_PM_KZ], Q.ACCEPTABLE),  # 14:00
-        (utc(2024, 1, 10, 2, 0), [SessionName.ASIA], [], Q.LOW_QUALITY),  # 21:00
+        (utc(2024, 1, 10, 2, 0), [SessionName.ASIA], [], Q.ACCEPTABLE),  # 21:00 (Asia boosted)
         (utc(2024, 1, 9, 11, 0), [], [], Q.LOW_QUALITY),  # 06:00, outside every window
         (utc(2024, 1, 9, 22, 30), [], [], Q.AVOID),  # 17:30 metals daily break
         (utc(2024, 1, 13, 15, 0), [SessionName.NY_AM, SessionName.LONDON_CLOSE], [], Q.AVOID),  # Saturday
